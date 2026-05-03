@@ -65,7 +65,7 @@ app.get('/api/agents', (_req, res) => {
   res.json({ agents: runtime.listAgents() });
 });
 
-app.post('/api/agents', (req, res) => {
+app.post('/api/agents', async (req, res) => {
   const { name, role, personality, ownerAddress } = req.body as {
     name?: string;
     role?: AgentRole;
@@ -79,10 +79,35 @@ app.post('/api/agents', (req, res) => {
   }
 
   const agent = runtime.createAgent({ name, role, personality, ownerAddress });
+
+  // Attempt real on-chain mint if we have an owner address
+  if (ownerAddress) {
+    try {
+      const { mintAgent } = await import('./contracts/index.js');
+      const metadataUri = agent.metadataUri || `0g://metadata/${agent.id}`;
+      const { tokenId, txHash } = await mintAgent(ownerAddress, name, role as any, metadataUri);
+      // Update agent record with token ID
+      agent.metadataUri = `0g://metadata/${tokenId}`;
+      res.status(201).json({
+        agentId: agent.id,
+        tokenId,
+        txHash,
+        onChain: true,
+        explorer: `https://chainscan-galileo.0g.ai/tx/${txHash}`,
+        axlPeerId: agent.axlPeerId,
+        agent,
+      });
+      return;
+    } catch (err) {
+      console.warn('[AgentMint] On-chain mint failed, falling back to demo:', (err as Error).message);
+    }
+  }
+
   res.status(201).json({
     agentId: agent.id,
-    tokenId: agent.id.replace(/\D/g, ''),
+    tokenId: null,
     txHash: `demo-mint-${agent.id}`,
+    onChain: false,
     axlPeerId: agent.axlPeerId,
     agent,
   });

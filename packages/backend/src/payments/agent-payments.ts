@@ -29,57 +29,70 @@ export async function distributeTaskPayment(
 ): Promise<PaymentDistribution> {
   const kh = getKeeperHub();
   const payments: PaymentResult[] = [];
+  const khKey = process.env.KH_API_KEY;
 
   console.log(`\n[Payment] Distributing $${totalBudgetUSDC} USDC for task #${taskId} (Base chain)`);
-  console.log(`[Payment] ${workers.length} workers\n`);
+  console.log(`[Payment] ${workers.length} workers, mode: ${khKey ? 'live-KeeperHub' : 'demo'}\n`);
 
   for (const worker of workers) {
-    const amount = ((totalBudgetUSDC * worker.sharePercent) / 100).toFixed(6);
+    const amount = (totalBudgetUSDC * worker.sharePercent) / 100;
 
-    try {
-      const result = await kh.payAgent(worker.walletAddress, amount);
-      const status = await kh.waitForPayment(result.executionId, 30000);
-
+    if (khKey && khKey.startsWith('kh_')) {
+      // Live KeeperHub USDC payment on Base
+      try {
+        const result = await kh.payAgent({
+          agentWallet: worker.walletAddress,
+          amount,
+          asset: 'USDC',
+          taskId: String(taskId),
+          description: `AgentVerse task #${taskId} — worker share`,
+        });
+        const status = await kh.waitForPayment(result.executionId, 30000);
+        payments.push({
+          agentId: worker.agentId,
+          walletAddress: worker.walletAddress,
+          amount: amount.toFixed(6),
+          status: status.status === 'completed' ? 'success' : 'failed',
+          executionId: result.executionId,
+          transactionHash: status.transactionHash,
+          error: status.error ?? undefined,
+        });
+        console.log(`  ✅ Agent #${worker.agentId}: $${amount.toFixed(2)} USDC → ${worker.walletAddress.slice(0, 10)}... | tx: ${status.transactionHash}`);
+      } catch (err) {
+        payments.push({
+          agentId: worker.agentId,
+          walletAddress: worker.walletAddress,
+          amount: amount.toFixed(6),
+          status: 'failed',
+          error: (err as Error).message,
+        });
+        console.error(`  ❌ Agent #${worker.agentId}: Payment failed — ${(err as Error).message}`);
+      }
+    } else {
+      // Demo mode — no KH key
+      const demoTx = `demo-payment-${taskId}-${worker.agentId}-${Date.now()}`;
       payments.push({
         agentId: worker.agentId,
         walletAddress: worker.walletAddress,
-        amount,
-        status: status.status === "completed" ? "success" : "failed",
-        executionId: result.executionId,
-        error: status.error || undefined,
+        amount: amount.toFixed(6),
+        status: 'success',
+        executionId: demoTx,
+        transactionHash: demoTx,
       });
-
-      console.log(
-        `  ✅ Agent #${worker.agentId}: $${amount} USDC → ${worker.walletAddress.slice(0, 10)}...`
-      );
-    } catch (err) {
-      payments.push({
-        agentId: worker.agentId,
-        walletAddress: worker.walletAddress,
-        amount,
-        status: "failed",
-        error: (err as Error).message,
-      });
-      console.error(
-        `  ❌ Agent #${worker.agentId}: Payment failed — ${(err as Error).message}`
-      );
+      console.log(`  🟡 Agent #${worker.agentId}: $${amount.toFixed(2)} USDC → ${worker.walletAddress.slice(0, 10)}... (demo — add KH_API_KEY for real)`);
     }
   }
 
-  const successCount = payments.filter((p) => p.status === "success").length;
+  const successCount = payments.filter((p) => p.status === 'success').length;
   console.log(`\n[Payment] Done: ${successCount}/${workers.length} successful`);
 
-  return {
-    taskId,
-    totalBudget: totalBudgetUSDC.toString(),
-    payments,
-    timestamp: Date.now(),
-  };
+  return { taskId, totalBudget: totalBudgetUSDC.toString(), payments, timestamp: Date.now() };
 }
 
 /**
  * Equal share distribution (coordinator gets a 10% bonus)
  */
+
 export function calculateEqualShares(
   workers: Array<{ agentId: number; walletAddress: string }>,
   coordinatorBonus = 10

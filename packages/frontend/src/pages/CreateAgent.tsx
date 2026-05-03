@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bot, Sparkles } from 'lucide-react';
+import { Bot, ExternalLink, Sparkles } from 'lucide-react';
 import type { AgentRole, PersonalityVector } from '../types';
 import { ROLE_COLORS, ROLE_EMOJIS, TRAIT_LABELS, apiFetch } from '../types';
+import { useWallet } from '../hooks/useWallet';
 
 const ROLE_DESCRIPTIONS: Record<AgentRole, string> = {
   coordinator: 'Manages, delegates, and orchestrates swarms.',
@@ -30,24 +31,32 @@ const TRAIT_DESCRIPTIONS: Record<keyof PersonalityVector, string> = {
 
 export default function CreateAgent() {
   const navigate = useNavigate();
+  const { address } = useWallet();
   const [name, setName] = useState('');
   const [role, setRole] = useState<AgentRole>('developer');
   const [personality, setPersonality] = useState<PersonalityVector>(DEFAULT_PERSONALITY);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState('');
+  const [mintResult, setMintResult] = useState<{ txHash: string; tokenId: number | null; onChain: boolean; explorer?: string } | null>(null);
 
   const roles: AgentRole[] = ['coordinator', 'developer', 'researcher', 'critic', 'trader'];
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) { setError('Agent name is required'); return; }
-    setIsCreating(true); setError('');
+    setIsCreating(true); setError(''); setMintResult(null);
     try {
-      const result = await apiFetch<{ agent: any; agentId: string }>('/api/agents', {
+      const result = await apiFetch<{ agent: any; agentId: string; txHash: string; tokenId: number | null; onChain: boolean; explorer?: string }>('/api/agents', {
         method: 'POST',
-        body: JSON.stringify({ name: name.trim(), role, personality }),
+        body: JSON.stringify({
+          name: name.trim(),
+          role,
+          personality,
+          ownerAddress: address,   // ← Gap 3: real on-chain mint when MetaMask connected
+        }),
       });
-      navigate(`/agents/${result.agentId || result.agent?.id}`);
+      setMintResult({ txHash: result.txHash, tokenId: result.tokenId, onChain: result.onChain, explorer: result.explorer });
+      setTimeout(() => navigate(`/agents/${result.agentId || result.agent?.id}`), 2000);
     } catch (err: any) {
       setError(err.message || 'Failed to create agent');
       setIsCreating(false);
@@ -159,6 +168,25 @@ export default function CreateAgent() {
                   </div>
                 </div>
 
+                {mintResult && (
+                  <div style={{ marginBottom: 14, padding: '12px 14px', background: mintResult.onChain ? 'rgba(126,231,135,0.08)' : 'rgba(85,182,255,0.08)', border: `1px solid ${mintResult.onChain ? 'rgba(126,231,135,0.3)' : 'rgba(85,182,255,0.3)'}`, borderRadius: 8 }}>
+                    <div className="flex items-center gap-2" style={{ marginBottom: 6 }}>
+                      <span className="onchain-badge">{mintResult.onChain ? '0G Chain' : 'Demo'}</span>
+                      <span style={{ fontSize: '0.8rem', color: mintResult.onChain ? 'var(--green)' : 'var(--accent)' }}>
+                        {mintResult.onChain ? `Token #${mintResult.tokenId} minted!` : 'Agent created (demo mode)'}
+                      </span>
+                    </div>
+                    {mintResult.onChain && mintResult.explorer && (
+                      <a href={mintResult.explorer} target="_blank" rel="noreferrer" className="flex items-center gap-1" style={{ fontSize: '0.75rem', color: 'var(--accent)' }}>
+                        <ExternalLink size={11} /> View on 0G ChainScan ↗
+                      </a>
+                    )}
+                    {!mintResult.onChain && (
+                      <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', margin: 0 }}>Connect MetaMask to mint a real iNFT on 0G Chain</p>
+                    )}
+                  </div>
+                )}
+
                 {error && (
                   <div style={{ marginBottom: 14, padding: '10px 14px', background: 'rgba(255,100,100,0.08)', border: '1px solid rgba(255,100,100,0.3)', borderRadius: 8, fontSize: '0.8rem', color: '#ff8080' }}>
                     {error}
@@ -167,15 +195,17 @@ export default function CreateAgent() {
 
                 <button className="btn btn-primary w-full btn-lg" type="submit" disabled={isCreating}>
                   {isCreating
-                    ? <><div className="spinner" style={{ width: 18, height: 18 }} /> Creating…</>
-                    : <><Sparkles size={18} /> Mint Agent iNFT</>}
+                    ? <><div className="spinner" style={{ width: 18, height: 18 }} /> {address ? 'Minting on-chain…' : 'Creating…'}</>
+                    : <><Sparkles size={18} /> {address ? 'Mint Agent iNFT on 0G' : 'Create Agent'}</>
+                  }
                 </button>
                 <p className="text-xs text-muted mt-2" style={{ textAlign: 'center', lineHeight: 1.5 }}>
-                  Agent identity stored on 0G Chain as ERC-7857 iNFT
+                  {address ? 'Mints ERC-7857 iNFT on 0G Chain (16602)' : 'Connect MetaMask to mint on-chain'}
                 </p>
               </div>
             </div>
           </div>
+
         </div>
       </form>
     </div>

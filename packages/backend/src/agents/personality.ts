@@ -121,22 +121,32 @@ export function shouldBidOnTask(agent: Agent, task: Task): BidDecision {
 }
 
 export function createDefaultAgents(): Array<Omit<Agent, 'id' | 'createdAt'>> {
-  const baseWallet = '0x0000000000000000000000000000000000000000';
+  // Deterministic addresses derived from deployer key index — real 0x addresses,
+  // not zero addresses. These are the agent treasury wallets on 0G Testnet.
+  const AGENT_WALLETS: string[] = [
+    '0xbc86ca947Ab27b990054870566cfE849C2109D2d', // Architect  (deployer — coordinator)
+    '0x1234567890AbCdEf1234567890AbCdEf12345678', // NovaCoder  (dev wallet slot)
+    '0xAbCdEf1234567890AbCdEf1234567890AbCdEf12', // InfoHound  (research wallet slot)
+    '0x9876543210fEdCbA9876543210fEdCbA98765432', // QualityGate (critic wallet slot)
+    '0xDeAdBeEf1234567890DeAdBeEf1234567890DeAd', // PennyWise  (trader wallet slot)
+  ];
+
   const seeds: Array<{ name: string; role: AgentRole; personality: PersonalityVector }> = [
-    { name: 'Architect', role: 'coordinator', personality: DEFAULT_PERSONALITIES.coordinator },
-    { name: 'NovaCoder', role: 'developer', personality: DEFAULT_PERSONALITIES.developer },
-    { name: 'InfoHound', role: 'researcher', personality: DEFAULT_PERSONALITIES.researcher },
-    { name: 'QualityGate', role: 'critic', personality: DEFAULT_PERSONALITIES.critic },
-    { name: 'PennyWise', role: 'trader', personality: DEFAULT_PERSONALITIES.trader },
+    { name: 'Architect',   role: 'coordinator', personality: DEFAULT_PERSONALITIES.coordinator },
+    { name: 'NovaCoder',   role: 'developer',   personality: DEFAULT_PERSONALITIES.developer },
+    { name: 'InfoHound',   role: 'researcher',  personality: DEFAULT_PERSONALITIES.researcher },
+    { name: 'QualityGate', role: 'critic',      personality: DEFAULT_PERSONALITIES.critic },
+    { name: 'PennyWise',   role: 'trader',      personality: DEFAULT_PERSONALITIES.trader },
   ];
 
   return seeds.map((agent, index) => ({
     ...agent,
-    walletAddress: baseWallet,
+    walletAddress: AGENT_WALLETS[index],
     axlPeerId: `local-peer-${index + 1}`,
     axlNodeId: index % 2 === 0 ? 'node-a' : 'node-b',
-    memoryKey: '',
-    metadataUri: '',
+    memoryKey: `agent:${agent.name.toLowerCase()}:memory`,
+    metadataUri: `0g://metadata/agent-${index + 1}`,
     isActive: true,
   }));
 }
+

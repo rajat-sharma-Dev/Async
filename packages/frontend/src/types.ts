@@ -35,6 +35,7 @@ export interface Subtask {
 export interface Task {
   id: string;
   description: string;
+  requester?: string;
   budget: number;
   status: string;
   coordinatorAgentId: string;
@@ -43,6 +44,9 @@ export interface Task {
   finalResult: string;
   createdAt: number;
   completedAt: number;
+  // On-chain fields (populated by bridge)
+  onChainTaskId?: number;
+  onChainTxHash?: string;
 }
 
 export interface PaymentReceipt {

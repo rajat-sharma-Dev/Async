@@ -144,10 +144,12 @@ export interface PaymentResult {
   agentId: number;
   walletAddress: string;
   amount: string;         // USDC amount
-  status: "success" | "failed" | "pending";
+  status: 'success' | 'failed' | 'pending';
   executionId?: string;
+  transactionHash?: string;  // Base USDC tx hash (from KeeperHub) or 0G tx hash
   error?: string;
 }
+
 
 export interface PaymentDistribution {
   taskId: number;

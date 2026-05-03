@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom';
 import { createRoot } from 'react-dom/client';
-import { Bot, LayoutDashboard, Wallet } from 'lucide-react';
+import { Bot, CircleDollarSign, LayoutDashboard, Wallet } from 'lucide-react';
 import './styles.css';
 
 import { useWallet } from './hooks/useWallet';
@@ -12,8 +12,10 @@ import type { Agent, Task } from './types';
 import Dashboard from './pages/Dashboard';
 import CreateAgent from './pages/CreateAgent';
 import AgentProfilePage from './pages/AgentProfile';
+import TaskDetail from './pages/TaskDetail';
+import Payments from './pages/Payments';
 
-// ── Types (from Pranav's additions) ────────────────────────────────────────
+// ── Types (health + topology from Pranav) ─────────────────────────────────
 interface Health {
   mode: string;
   contracts?: Record<string, string>;
@@ -30,11 +32,7 @@ interface AxlTopology {
 }
 
 // ── Nav ────────────────────────────────────────────────────────────────────
-function Nav({ wsConnected, health, topology }: {
-  wsConnected: boolean;
-  health: Health | null;
-  topology: AxlTopology | null;
-}) {
+function Nav({ wsConnected, health }: { wsConnected: boolean; health: Health | null }) {
   const { address, balance, isConnecting, connect, disconnect, shortAddress, isOnOGChain } = useWallet();
 
   return (
@@ -51,18 +49,21 @@ function Nav({ wsConnected, health, topology }: {
         <NavLink to="/agents/create" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
           <Bot size={15} /> Create Agent
         </NavLink>
+        <NavLink to="/payments" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+          <CircleDollarSign size={15} /> Payments
+        </NavLink>
       </div>
 
       <div className="nav-right">
-        {/* AXL + Chain status pills */}
-        <div className="network-badge" title={summarizeNodes(topology)}>
+        {/* Network badge */}
+        <div className="network-badge" title={health?.chains?.agentVerse?.name}>
           <div className={`wallet-dot ${wsConnected ? 'live' : 'off'}`} />
           {health?.chains?.agentVerse?.name || '0G Testnet'}
         </div>
 
         {health?.wallet?.balance && (
           <div className="network-badge" style={{ background: 'rgba(126,231,135,0.08)', borderColor: 'rgba(126,231,135,0.2)', color: 'var(--green)' }}>
-            {health.wallet.balance}
+            {health.wallet.balance.split(' ')[0]} A0GI
           </div>
         )}
 
@@ -93,6 +94,7 @@ function App() {
   const [topology, setTopology] = useState<AxlTopology | null>(null);
 
   const { events, connected, registerSnapshotHandler } = useWebSocket();
+  const { address } = useWallet();
 
   const refresh = useCallback(async () => {
     try {
@@ -105,7 +107,6 @@ function App() {
     } catch { /* non-fatal */ }
   }, []);
 
-  // Fetch health + topology (less frequently)
   const refreshMeta = useCallback(async () => {
     try {
       const [h, t] = await Promise.all([
@@ -125,7 +126,7 @@ function App() {
     });
   }, [registerSnapshotHandler]);
 
-  // Poll for task updates when events arrive
+  // Poll on events
   useEffect(() => {
     const last = events[events.length - 1];
     if (!last) return;
@@ -145,7 +146,7 @@ function App() {
     <BrowserRouter>
       <div className="app-bg" />
       <div className="app-root">
-        <Nav wsConnected={connected} health={health} topology={topology} />
+        <Nav wsConnected={connected} health={health} />
         <Routes>
           <Route
             path="/"
@@ -157,19 +158,22 @@ function App() {
                 wsConnected={connected}
                 health={health}
                 topology={topology}
+                walletAddress={address || undefined}
                 onRefresh={refresh}
               />
             }
           />
           <Route path="/agents/create" element={<CreateAgent />} />
           <Route path="/agents/:id" element={<AgentProfilePage />} />
+          <Route path="/tasks/:id" element={<TaskDetail />} />
+          <Route path="/payments" element={<Payments />} />
         </Routes>
       </div>
     </BrowserRouter>
   );
 }
 
-// ── Utilities (Pranav's additions kept) ────────────────────────────────────
+// ── Utilities (re-exported for pages) ─────────────────────────────────────
 export function summarizeNodes(topology: AxlTopology | null): string {
   if (!topology) return 'Node status loading';
   const entries = Object.entries(topology.nodes || {});
@@ -177,7 +181,10 @@ export function summarizeNodes(topology: AxlTopology | null): string {
   return entries.map(([node, value]) => `${node}: ${value.status || 'reachable'}`).join(', ');
 }
 
-export function findChainSubmission(events: Array<{ id: string; event: string; data: any; timestamp: number }>, taskId: string): string | null {
+export function findChainSubmission(
+  events: Array<{ id: string; event: string; data: any; timestamp: number }>,
+  taskId: string
+): string | null {
   const event = [...events].reverse().find(
     (item) => item.event === 'chain:resultSubmitted' && item.data?.taskId === taskId,
   );

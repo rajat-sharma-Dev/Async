@@ -78,20 +78,28 @@ export class KeeperHubClient {
    *  - Daily cap:        200 USDC (server-enforced)
    *  - Safety auto-approve: ≤$5, ask: ≤$100, block: >$100
    */
-  async payAgent(
-    workerWalletAddress: string,
-    amountUSDC: string
-  ): Promise<DirectExecutionResult> {
+  async payAgent(params: {
+    agentWallet: string;
+    amount: number;
+    asset?: string;
+    taskId?: string;
+    description?: string;
+  }): Promise<DirectExecutionResult> {
+    const amountStr = params.amount.toFixed(6);
     console.log(
-      `[KeeperHub] Paying agent $${amountUSDC} USDC → ${workerWalletAddress}`
+      `[KeeperHub] Paying agent $${amountStr} USDC → ${params.agentWallet}${params.taskId ? ` (task: ${params.taskId})` : ''}`
     );
-    return this.request("/execute/transfer", {
-      method: "POST",
+    return this.request('/execute/transfer', {
+      method: 'POST',
       body: JSON.stringify({
-        network: "base",
-        recipientAddress: workerWalletAddress,
-        amount: amountUSDC,
+        network: 'base',
+        recipientAddress: params.agentWallet,
+        amount: amountStr,
         tokenAddress: BASE_USDC_ADDRESS,
+        metadata: {
+          taskId: params.taskId,
+          description: params.description || 'AgentVerse task payment',
+        },
       }),
     });
   }

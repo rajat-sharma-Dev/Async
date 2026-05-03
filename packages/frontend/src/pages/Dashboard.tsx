@@ -26,6 +26,7 @@ interface Props {
   wsConnected: boolean;
   health: Health | null;
   topology: AxlTopology | null;
+  walletAddress?: string;
   onRefresh: () => void;
 }
 
@@ -51,13 +52,14 @@ function summarizeEvent(item: TimelineEvent): string {
   return JSON.stringify(d).slice(0, 160);
 }
 
-export default function Dashboard({ agents, tasks, events, wsConnected, health, topology, onRefresh }: Props) {
+export default function Dashboard({ agents, tasks, events, wsConnected, health, topology, walletAddress, onRefresh }: Props) {
   const navigate = useNavigate();
   const [description, setDescription] = useState(
     'Build a responsive landing page for a DeFi yield aggregator. Include hero section, features grid, token stats, and a call-to-action.'
   );
   const [budget, setBudget] = useState(5);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [lastTxHash, setLastTxHash] = useState<string | null>(null);
 
   const activeTask = tasks[0];
   const completedSubs = activeTask?.subtasks.filter(s => s.status === 'complete').length ?? 0;
@@ -67,11 +69,17 @@ export default function Dashboard({ agents, tasks, events, wsConnected, health, 
     e.preventDefault();
     if (!description.trim()) return;
     setIsSubmitting(true);
+    setLastTxHash(null);
     try {
-      await apiFetch('/api/tasks', {
+      const res = await apiFetch<{ taskId: string; txHash: string; task: Task }>('/api/tasks', {
         method: 'POST',
-        body: JSON.stringify({ description: description.trim(), budget }),
+        body: JSON.stringify({
+          description: description.trim(),
+          budget,
+          requesterAddress: walletAddress,  // ← Gap 2: wire MetaMask address
+        }),
       });
+      setLastTxHash(res.txHash);
       onRefresh();
     } catch (err) {
       console.error(err);
@@ -183,6 +191,11 @@ export default function Dashboard({ agents, tasks, events, wsConnected, health, 
             <div className="panel-header">
               <Send size={16} />
               <span>Submit Task to Swarm</span>
+              {walletAddress && (
+                <span className="text-xs text-muted" style={{ marginLeft: 'auto' }}>
+                  Requester: {walletAddress.slice(0, 8)}…{walletAddress.slice(-4)}
+                </span>
+              )}
             </div>
             <form className="task-form" onSubmit={submitTask}>
               <div>
@@ -210,6 +223,14 @@ export default function Dashboard({ agents, tasks, events, wsConnected, health, 
                   {isSubmitting ? <><div className="spinner" style={{ width: 16, height: 16 }} /> Starting…</> : <><Sparkles size={16} /> Run Swarm</>}
                 </button>
               </div>
+              {lastTxHash && !lastTxHash.startsWith('demo') && (
+                <div className="result-hash" style={{ marginTop: 10 }}>
+                  <span className="onchain-badge">0G Chain</span>
+                  <a href={`https://chainscan-galileo.0g.ai/tx/${lastTxHash}`} target="_blank" rel="noreferrer" style={{ color: 'var(--green)', fontSize: '0.75rem' }}>
+                    Task created on-chain ↗
+                  </a>
+                </div>
+              )}
             </form>
           </div>
 
@@ -247,14 +268,25 @@ export default function Dashboard({ agents, tasks, events, wsConnected, health, 
                 {activeTask.resultHash && (
                   <div className="result-hash">
                     <CheckCircle2 size={14} style={{ flexShrink: 0, marginTop: 2 }} />
-                    <div>
+                    <div style={{ flex: 1 }}>
                       <div className="flex items-center gap-2 mb-2">
                         <span className="onchain-badge">0G Chain</span>
                         <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                           {findChainSubmission(events, activeTask.id) || 'Result stored on-chain'}
                         </span>
                       </div>
-                      {activeTask.resultHash}
+                      <div style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', wordBreak: 'break-all' }}>
+                        {activeTask.resultHash}
+                      </div>
+                      <div className="flex items-center gap-3 mt-2">
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => navigate(`/tasks/${activeTask.id}`)}
+                        >
+                          View full task ↗
+                        </button>
+                        <a href="/payments" style={{ fontSize: '0.75rem', color: 'var(--accent)' }}>View payments →</a>
+                      </div>
                     </div>
                   </div>
                 )}
