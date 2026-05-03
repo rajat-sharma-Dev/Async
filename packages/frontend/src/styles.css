@@ -1,0 +1,325 @@
+:root {
+  color: #eef4ff;
+  background: #111318;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+main {
+  min-height: 100vh;
+  background:
+    linear-gradient(135deg, rgba(85, 182, 255, 0.12), transparent 28%),
+    linear-gradient(225deg, rgba(126, 231, 135, 0.08), transparent 30%),
+    #111318;
+  padding: 18px;
+}
+
+.topbar {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin: 0 auto 18px;
+  max-width: 1440px;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 28px;
+  letter-spacing: 0;
+}
+
+.topbar p {
+  color: #a8b3c7;
+  margin-top: 3px;
+}
+
+.statusPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.statusPills span,
+.taskStatus {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  color: #dbe7ff;
+  display: inline-flex;
+  gap: 6px;
+  padding: 7px 10px;
+}
+
+.layout {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(260px, 320px) minmax(360px, 1fr) minmax(280px, 360px);
+  margin: 0 auto;
+  max-width: 1440px;
+}
+
+.panel {
+  background: rgba(21, 25, 34, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.25);
+}
+
+.panelHeader {
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  gap: 8px;
+  padding: 14px;
+}
+
+.panelHeader h2 {
+  font-size: 15px;
+}
+
+.agentList,
+.eventList,
+.subtasks {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.agentCard {
+  background: #191f2a;
+  border: 1px solid;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.agentTop {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.agentTop span {
+  color: #a8b3c7;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.bars {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.bars label {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 96px 1fr;
+}
+
+.bars span,
+.agentCard small,
+.eventList time {
+  color: #8e99ad;
+  font-size: 11px;
+}
+
+meter {
+  height: 8px;
+  width: 100%;
+}
+
+.workbench {
+  display: grid;
+  gap: 16px;
+  grid-template-rows: auto 1fr;
+}
+
+.taskForm {
+  padding-bottom: 14px;
+}
+
+textarea {
+  background: #0f131b;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #eef4ff;
+  display: block;
+  min-height: 120px;
+  margin: 14px;
+  padding: 12px;
+  resize: vertical;
+  width: calc(100% - 28px);
+}
+
+.formRow {
+  align-items: end;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 0 14px;
+}
+
+.formRow label {
+  color: #a8b3c7;
+  display: grid;
+  gap: 6px;
+  max-width: 180px;
+}
+
+input {
+  background: #0f131b;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #eef4ff;
+  padding: 10px;
+}
+
+button {
+  align-items: center;
+  background: #7ee787;
+  border: 0;
+  border-radius: 8px;
+  color: #07120a;
+  cursor: pointer;
+  display: inline-flex;
+  font-weight: 700;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 16px;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.taskSummary {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.taskStatus.completed {
+  background: rgba(126, 231, 135, 0.14);
+  color: #7ee787;
+}
+
+.taskStatus.in_progress,
+.taskStatus.bidding {
+  background: rgba(85, 182, 255, 0.14);
+  color: #55b6ff;
+}
+
+.subtasks article,
+.eventList article {
+  background: #191f2a;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.subtasks article div {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.subtasks span {
+  color: #a8b3c7;
+  display: block;
+  font-size: 12px;
+  margin: 5px 0 8px;
+  text-transform: uppercase;
+}
+
+.subtasks p,
+.eventList p,
+.empty {
+  color: #c6d2e6;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.resultHash {
+  background: #0f131b;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: #7ee787;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  padding: 14px;
+}
+
+.empty {
+  padding: 18px;
+}
+
+.eventPanel {
+  max-height: calc(100vh - 100px);
+  overflow: hidden;
+}
+
+.eventList {
+  max-height: calc(100vh - 160px);
+  overflow: auto;
+}
+
+.eventList strong {
+  display: block;
+  font-size: 13px;
+  margin: 3px 0 5px;
+}
+
+@media (max-width: 1120px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .eventPanel {
+    max-height: none;
+  }
+
+  .eventList {
+    max-height: 420px;
+  }
+}
+
+@media (max-width: 680px) {
+  main {
+    padding: 12px;
+  }
+
+  .topbar,
+  .formRow {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .statusPills {
+    justify-content: flex-start;
+  }
+}

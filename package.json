@@ -13,7 +13,8 @@
     "contracts:deploy": "npm run deploy:testnet --workspace=packages/contracts",
     "contracts:test": "npm run test --workspace=packages/contracts",
     "backend:dev": "npm run dev --workspace=packages/backend",
-    "frontend:dev": "npm run dev --workspace=packages/frontend"
+    "frontend:dev": "npm run dev --workspace=packages/frontend",
+    "demo:swarm": "npm exec --workspace=packages/backend -- tsx ../../examples/swarm-demo.ts"
   },
   "repository": {
     "type": "git",

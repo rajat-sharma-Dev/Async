@@ -1,51 +1,37 @@
-/**
- * 0G Compute LLM Provider
- * OpenAI-compatible decentralized inference
- * 📖 Ref: docs/tracks-docs/OG-compute.md
- *
- * API: https://router-api.0g.ai/v1
- * All models are TEE-attested (TDX enclaves)
- *
- * Available models:
- *   deepseek/deepseek-chat-v3-0324  - 671B MoE, best quality, tool calling
- *   zai-org/GLM-5-FP8               - native tool calling, reasoning
- *   zai-org/GLM-5.1-FP8             - 131k context
- *   qwen3.6-plus                    - 1M context, agentic coding
- */
-
-import { config } from "dotenv";
-import { resolve, dirname } from "path";
-import { fileURLToPath } from "url";
+import { config } from 'dotenv';
+import { dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-config({ path: resolve(__dirname, "../../../../.env") });
+config({ path: resolve(__dirname, '../../../../.env') });
+config();
 
-const BASE_URL = process.env.LLM_BASE_URL || "https://router-api.0g.ai/v1";
-const DEFAULT_MODEL = process.env.LLM_MODEL || "deepseek/deepseek-chat-v3-0324";
+const DEFAULT_BASE_URL = process.env.LLM_BASE_URL || 'https://router-api.0g.ai/v1';
+const DEFAULT_MODEL = process.env.LLM_MODEL || 'zai-org/GLM-5-FP8';
 
 export interface ChatMessage {
-  role: "system" | "user" | "assistant" | "tool";
+  role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
   name?: string;
   tool_call_id?: string;
 }
 
 export interface ToolDefinition {
-  type: "function";
+  type: 'function';
   function: {
     name: string;
     description: string;
-    parameters: Record<string, any>;
+    parameters: Record<string, unknown>;
   };
 }
 
-export interface ChatOptions {
+export interface LLMOptions {
   model?: string;
   temperature?: number;
   maxTokens?: number;
   tools?: ToolDefinition[];
-  toolChoice?: "auto" | "none" | "required";
-  responseFormat?: { type: "json_object" | "text" };
+  toolChoice?: 'auto' | 'none' | 'required';
+  responseFormat?: { type: 'json_object' | 'text' } | { type: string };
 }
 
 export interface ChatResponse {
@@ -55,75 +41,94 @@ export interface ChatResponse {
   toolCalls?: Array<{ id: string; function: { name: string; arguments: string } }>;
 }
 
-export class ZeroGComputeProvider {
-  private apiKey: string;
-  private model: string;
+export interface LLMProvider {
+  complete(prompt: string, options?: LLMOptions): Promise<string>;
+  chat(messages: ChatMessage[], options?: LLMOptions): Promise<string>;
+}
 
-  constructor(apiKey?: string, model?: string) {
-    this.apiKey = apiKey || process.env.LLM_API_KEY || "";
+export class ZeroGComputeProvider implements LLMProvider {
+  private readonly baseUrl: string;
+  private readonly apiKey: string;
+  private readonly model: string;
+
+  constructor(apiKey?: string, model?: string, baseUrl?: string) {
+    this.baseUrl = baseUrl || DEFAULT_BASE_URL;
+    this.apiKey = apiKey || process.env.LLM_API_KEY || '';
     this.model = model || DEFAULT_MODEL;
-    if (!this.apiKey) console.warn("[0G Compute] No API key. LLM calls will fail.");
+    if (!this.apiKey && process.env.AGENTVERSE_DEMO_MODE !== 'true') {
+      console.warn('[0G Compute] No API key. Live LLM calls will fail.');
+    }
   }
 
-  async chat(messages: ChatMessage[], options: ChatOptions = {}): Promise<ChatResponse> {
-    const body: any = {
+  async complete(prompt: string, options: LLMOptions = {}): Promise<string> {
+    return this.chat([{ role: 'user', content: prompt }], options);
+  }
+
+  async chat(messages: ChatMessage[], options: LLMOptions = {}): Promise<string> {
+    const response = await this.chatRaw(messages, options);
+    return response.content;
+  }
+
+  async chatRaw(messages: ChatMessage[], options: LLMOptions = {}): Promise<ChatResponse> {
+    if (!this.apiKey || this.apiKey.includes('your_')) {
+      throw new LLMError('0G Compute API key is not configured', 401);
+    }
+
+    const body: Record<string, unknown> = {
       model: options.model || this.model,
       messages,
       temperature: options.temperature ?? 0.7,
       max_tokens: options.maxTokens ?? 2048,
+      verify_tee: true,
     };
     if (options.tools?.length) {
       body.tools = options.tools;
-      body.tool_choice = options.toolChoice || "auto";
+      body.tool_choice = options.toolChoice || 'auto';
     }
     if (options.responseFormat) body.response_format = options.responseFormat;
 
-    const res = await fetch(`${BASE_URL}/chat/completions`, {
-      method: "POST",
+    const res = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: 'POST',
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
-        "Content-Type": "application/json",
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
     });
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new LLMError(
-        `0G Compute ${res.status}: ${err.error?.message || res.statusText}`,
-        res.status
-      );
+      throw new LLMError(`0G Compute ${res.status}: ${err.error?.message || res.statusText}`, res.status);
     }
 
     const data = await res.json();
-    const choice = data.choices[0];
-    const msg = choice.message;
+    const message = data.choices?.[0]?.message || {};
+    if (data.x_0g_trace) console.log('[0G Compute]', JSON.stringify(data.x_0g_trace));
 
     return {
-      content: msg.content || "",
-      model: data.model,
-      usage: data.usage,
-      toolCalls: msg.tool_calls?.map((tc: any) => ({ id: tc.id, function: tc.function })),
+      content: message.content || '',
+      model: data.model || options.model || this.model,
+      usage: data.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+      toolCalls: message.tool_calls?.map((tc: any) => ({ id: tc.id, function: tc.function })),
     };
   }
 
-  /** Decompose a task into subtasks (JSON output) */
   async decomposeTask(
     taskDescription: string,
-    availableRoles: string[]
+    availableRoles: string[],
   ): Promise<{ subtasks: Array<{ description: string; assignTo: string; priority: number }> }> {
-    const response = await this.chat(
+    const response = await this.chatRaw(
       [
         {
-          role: "system",
-          content: `You are a task decomposition engine. Break complex tasks into subtasks and assign each to the best available role. Roles: ${availableRoles.join(", ")}. Respond with JSON only.`,
+          role: 'system',
+          content: `You are a task decomposition engine. Break complex tasks into subtasks and assign each to the best available role. Roles: ${availableRoles.join(', ')}. Respond with JSON only.`,
         },
         {
-          role: "user",
+          role: 'user',
           content: `Decompose: "${taskDescription}"\n\nJSON: { "subtasks": [{ "description": "...", "assignTo": "Role", "priority": 1-5 }] }`,
         },
       ],
-      { responseFormat: { type: "json_object" }, temperature: 0.3 }
+      { responseFormat: { type: 'json_object' }, temperature: 0.3 },
     );
     try {
       return JSON.parse(response.content);
@@ -132,35 +137,37 @@ export class ZeroGComputeProvider {
     }
   }
 
-  /** Evaluate a bid economically */
   async evaluateBid(params: {
     taskDescription: string;
     bidAmount: string;
     agentBudget: string;
     costSensitivity: number;
   }): Promise<{ accept: boolean; reason: string; counterOffer?: string }> {
-    const response = await this.chat(
+    const response = await this.chatRaw(
       [
         {
-          role: "system",
+          role: 'system',
           content: `Economic decision engine. Cost sensitivity: ${params.costSensitivity}/100. Respond JSON only.`,
         },
         {
-          role: "user",
+          role: 'user',
           content: `Task: "${params.taskDescription}"\nBid: ${params.bidAmount}\nBudget: ${params.agentBudget}\nAccept? JSON: { "accept": bool, "reason": "...", "counterOffer": "amount or null" }`,
         },
       ],
-      { responseFormat: { type: "json_object" }, temperature: 0.2 }
+      { responseFormat: { type: 'json_object' }, temperature: 0.2 },
     );
     try {
       return JSON.parse(response.content);
     } catch {
-      return { accept: true, reason: "Default acceptance" };
+      return { accept: true, reason: 'Default acceptance' };
     }
   }
 
   async listModels(): Promise<Array<{ id: string; name: string; context_length: number }>> {
-    const res = await fetch(`${BASE_URL}/models`, {
+    if (!this.apiKey || this.apiKey.includes('your_')) {
+      throw new LLMError('0G Compute API key is not configured', 401);
+    }
+    const res = await fetch(`${this.baseUrl}/models`, {
       headers: { Authorization: `Bearer ${this.apiKey}` },
     });
     if (!res.ok) throw new LLMError(`Models list failed: ${res.status}`, res.status);
@@ -169,15 +176,62 @@ export class ZeroGComputeProvider {
   }
 }
 
-export class LLMError extends Error {
-  constructor(message: string, public statusCode: number) {
-    super(message);
-    this.name = "LLMError";
+export class OpenAIProvider implements LLMProvider {
+  private readonly apiKey = process.env.OPENAI_API_KEY || '';
+  private readonly model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+
+  async complete(prompt: string, options?: LLMOptions): Promise<string> {
+    return this.chat([{ role: 'user', content: prompt }], options);
+  }
+
+  async chat(messages: ChatMessage[], options: LLMOptions = {}): Promise<string> {
+    if (!this.apiKey) throw new LLMError('OpenAI API key is not configured', 401);
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: options.model || this.model,
+        messages,
+        max_tokens: options.maxTokens || 1200,
+        temperature: options.temperature ?? 0.45,
+      }),
+    });
+    if (!res.ok) throw new LLMError(`OpenAI ${res.status}: ${await res.text()}`, res.status);
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content?.trim() || '';
   }
 }
 
-let _provider: ZeroGComputeProvider;
+export class LocalHeuristicProvider implements LLMProvider {
+  async complete(prompt: string): Promise<string> {
+    const trimmed = prompt.replace(/\s+/g, ' ').slice(0, 260);
+    return `Local demo reasoning: ${trimmed}${prompt.length > 260 ? '...' : ''}`;
+  }
+
+  async chat(messages: ChatMessage[]): Promise<string> {
+    return this.complete(messages.map((message) => message.content).join('\n'));
+  }
+}
+
+export class LLMError extends Error {
+  constructor(message: string, public statusCode: number) {
+    super(message);
+    this.name = 'LLMError';
+  }
+}
+
+let zeroGProvider: ZeroGComputeProvider | undefined;
 export function getLLM(): ZeroGComputeProvider {
-  if (!_provider) _provider = new ZeroGComputeProvider();
-  return _provider;
+  if (!zeroGProvider) zeroGProvider = new ZeroGComputeProvider();
+  return zeroGProvider;
+}
+
+export function createLLMProvider(): LLMProvider {
+  const provider = (process.env.LLM_PROVIDER || '0g').toLowerCase();
+  if (provider === 'local' || process.env.AGENTVERSE_DEMO_MODE === 'true') return new LocalHeuristicProvider();
+  if (provider === 'openai') return new OpenAIProvider();
+  return getLLM();
 }
