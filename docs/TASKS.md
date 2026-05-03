@@ -15,30 +15,34 @@
 
 ### 🟢 Rajat — Web3 + Storage
 
-- [ ] **Project scaffolding** — Set up monorepo with npm workspaces, shared tsconfig
+- [x] **Project scaffolding** — Monorepo with npm workspaces (`contracts`, `backend`, `frontend`, `axl-nodes`)
   - 📖 Ref: [ARCHITECTURE.md](./ARCHITECTURE.md) (project structure), [INTERFACES.md](./INTERFACES.md) (shared types)
+  - ✅ `package.json` root with workspaces, `.gitignore`, `tsconfig.json`
 
-- [ ] **Smart contract: `AgentNFT.sol`** — ERC-7857 iNFT for agent identity
-  - 📖 Ref: [SMART_CONTRACTS.md](./SMART_CONTRACTS.md) → "Contract 1: AgentNFT", [0G_INTEGRATION.md](./0G_INTEGRATION.md) → "ERC-7857 iNFT"
+- [x] **Smart contract: `AgentNFT.sol`** — ERC-721 Enumerable iNFT with roles, reputation, earnings
+  - 📖 Ref: [SMART_CONTRACTS.md](./SMART_CONTRACTS.md) → "Contract 1: AgentNFT"
+  - ✅ Compiled (Solidity 0.8.24, EVM cancun). Includes: 5 roles, reputation tracking, owner enumeration
 
-- [ ] **Smart contract: `TaskManager.sol`** — Task lifecycle + budget management
+- [x] **Smart contract: `TaskManager.sol`** — Full lifecycle with budget escrow
   - 📖 Ref: [SMART_CONTRACTS.md](./SMART_CONTRACTS.md) → "Contract 2: TaskManager"
+  - ✅ Compiled. Includes: escrow, bidding, swarm formation, result submission, payment + refunds, failTask
 
-- [ ] **Smart contract: `Auction.sol`** — Sealed-bid auction for task assignment
-  - 📖 Ref: [SMART_CONTRACTS.md](./SMART_CONTRACTS.md) → "Contract 3: Auction", [SWARM_LOGIC.md](./SWARM_LOGIC.md) → "Auction/Bidding System"
+- [x] **Smart contract: `Auction.sol`** — Time-limited auction with off-chain scoring
+  - 📖 Ref: [SMART_CONTRACTS.md](./SMART_CONTRACTS.md) → "Contract 3: Auction"
+  - ✅ Compiled. Includes: start/bid/finalize/cancel, active status check
 
-- [ ] **Hardhat config for 0G testnet** — Network config, deploy scripts
+- [x] **Hardhat config for 0G testnet** — Network config, deploy scripts, verification
   - 📖 Ref: [SMART_CONTRACTS.md](./SMART_CONTRACTS.md) → "Deployment", [0G_INTEGRATION.md](./0G_INTEGRATION.md) → "0G Chain"
-  - ⚠️ Must set `evmVersion: "cancun"` in Hardhat config!
-  - Testnet RPC: `https://evmrpc-testnet.0g.ai`, Chain ID: `16602`
-  - Faucet: [faucet.0g.ai](https://faucet.0g.ai/)
+  - ✅ Solidity 0.8.24, `evmVersion: "cancun"`, testnet (16602) + mainnet (16661)
+  - ✅ Deploy script: `packages/contracts/scripts/deploy.js`
 
-- [ ] **0G Storage KV wrapper** — Agent memory read/write via CLI/SDK
+- [x] **0G Storage KV wrapper** — Agent memory read/write via CLI wrapper
   - 📖 Ref: [0G_INTEGRATION.md](./0G_INTEGRATION.md) → "0G Storage", [tracks-docs/OG-storage.md](./tracks-docs/OG-storage.md)
-  - Note: Uses stream IDs + comma-separated keys/values. Read uses `--node`, write uses `--indexer`
+  - ✅ `packages/backend/src/storage/zerog.ts` — `ZeroGMemory` class with getAgentState/Memory/TaskHistory
 
-- [ ] **Environment config** — `.env.example` with all required vars
+- [x] **Environment config** — `.env.example` with all required vars
   - 📖 Ref: [README.md](./README.md) → "Environment Variables"
+  - ✅ Covers: 0G Chain/Storage/Compute, AXL, KeeperHub, contract addresses, frontend
 
 ### 🔵 Pranav — AI + P2P
 
@@ -46,8 +50,9 @@
   - 📖 Ref: [AXL_INTEGRATION.md](./AXL_INTEGRATION.md) → "Setup", [tracks-docs/AXL.md](./tracks-docs/AXL.md) → "Get Started"
   - ⚠️ Needs Go 1.25.x (NOT 1.26). macOS: `brew install openssl` for key generation
 
-- [ ] **AXL node configs** — Create configs for 2 local nodes (ports 9002 + 9012)
+- [x] **AXL node configs** — Created configs for 2 local nodes (ports 9002 + 9012)
   - 📖 Ref: [AXL_INTEGRATION.md](./AXL_INTEGRATION.md) → "Step 3: Configure Nodes", [tracks-docs/AXL.md](./tracks-docs/AXL.md) → "Configuration"
+  - ✅ `packages/axl-nodes/node-config.json` (Node A) + `node-config-2.json` (Node B)
   - ⚠️ Config uses mixed casing: PascalCase for Yggdrasil, snake_case for AXL
 
 - [ ] **AXL TypeScript client wrapper** — `axl/client.ts` wrapping `/send`, `/recv`, `/topology`
@@ -71,8 +76,9 @@
 
 ### 🟣 Both — Integration Test
 
-- [ ] **Agree on shared interfaces** — Finalize types in INTERFACES.md
+- [/] **Agree on shared interfaces** — Finalize types in INTERFACES.md
   - 📖 Ref: [INTERFACES.md](./INTERFACES.md)
+  - 🟡 Types defined in docs; need to create actual `.ts` files
 
 - [ ] **Test AXL node ↔ backend** — Verify send/recv between two nodes
   - 📖 Ref: [AXL_INTEGRATION.md](./AXL_INTEGRATION.md) → "Step 5: Verify + Quick Test"
@@ -135,8 +141,9 @@
 - [ ] **Agent memory persistence** — Read/write 0G KV during task execution
   - 📖 Ref: [0G_INTEGRATION.md](./0G_INTEGRATION.md) → "Memory Operations in Agent Lifecycle"
 
-- [ ] **Express API server** — `server.ts` — REST + WebSocket
+- [x] **Express API server** — `server.ts` — REST + WebSocket skeleton
   - 📖 Ref: [BACKEND.md](./BACKEND.md) → "API Endpoints", "WebSocket Events"
+  - ✅ `packages/backend/src/server.ts` — Express + WS + broadcast helper (routes TBD)
 
 - [ ] **API routes** — Tasks, agents, payments
   - 📖 Ref: [BACKEND.md](./BACKEND.md) → tables, [INTERFACES.md](./INTERFACES.md) → "API Request/Response Types"

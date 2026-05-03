@@ -4,9 +4,13 @@
 
 All contracts deploy on **0G Chain** (EVM-compatible L2). Three core contracts:
 
-1. **AgentNFT** — ERC-7857 iNFT for agent identity
+1. **AgentNFT** — ERC-721 Enumerable iNFT for agent identity
 2. **TaskManager** — Task lifecycle + budget management
-3. **Auction** — Sealed-bid auction for task assignment
+3. **Auction** — Time-limited auction for task assignment
+
+> **✅ Implementation Status:** All 3 contracts compiled (Solidity 0.8.24, EVM cancun).
+> Source: `packages/contracts/contracts/`. Deploy: `npm run contracts:deploy`.
+> ⚠️ Pending: deployment to 0G testnet (needs PRIVATE_KEY + faucet tokens).
 
 ---
 

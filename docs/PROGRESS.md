@@ -1,11 +1,11 @@
 # 📊 PROGRESS.md — Live Progress Log
 
-## Status: 🟡 Documentation Phase
+## Status: 🟢 Phase 1 — Rajat Tasks Complete
 
 | Phase | Status | Rajat | Pranav |
 |-------|--------|-------|--------|
-| Docs & Planning | 🟡 In Progress | Writing docs | — |
-| Phase 1: Foundation | ⬜ Not Started | — | — |
+| Docs & Planning | ✅ Complete | All 17 docs written | — |
+| Phase 1: Foundation | 🟡 In Progress | ✅ All tasks done | ⬜ Not started |
 | Phase 2: Swarm + Economy | ⬜ Not Started | — | — |
 | Phase 3: Frontend + Demo | ⬜ Not Started | — | — |
 
@@ -19,29 +19,85 @@
 
 **06:35** — Decisions finalized:
 - Chain: 0G Chain for contracts, x402/KeeperHub settles on Base (no bridge needed)
-- LLM: Pluggable (TBD based on hackathon resources)
+- LLM: **0G Compute Router** (OpenAI-compatible decentralized inference) — decided after reading OG-compute.md
 - Agent types: 5 (Coordinator, Developer, Researcher, Critic, Trader)
-- AXL: Will configure after reviewing AXL docs
+- AXL: Configured with real docs (Go 1.25.x, ports 9002/9012)
 - Frontend: Design TBD
 
-**07:00** — All 17 documentation files generated:
-- ✅ README.md
-- ✅ ARCHITECTURE.md
-- ✅ AGENT_DESIGN.md
-- ✅ SWARM_LOGIC.md
-- ✅ AXL_INTEGRATION.md
-- ✅ 0G_INTEGRATION.md
-- ✅ KEEPERHUB_X402.md
-- ✅ SMART_CONTRACTS.md
-- ✅ BACKEND.md
-- ✅ FRONTEND.md (placeholder — awaiting design input)
-- ✅ USER_FLOW.md
-- ✅ USER_GUIDE.md
-- ✅ DEMO_FLOW.md
-- ✅ TASKS.md
-- ✅ PROGRESS.md
-- ✅ INTERFACES.md
-- ✅ TRACK_MAPPING.md
+**07:00** — All 17 documentation files generated (see docs/ folder).
+
+**07:15** — AXL docs reviewed (1500+ lines). Updated AXL_INTEGRATION.md, ARCHITECTURE.md, BACKEND.md with correct specs:
+- Go 1.25.x requirement, config format (mixed PascalCase/snake_case)
+- Send/Recv pattern, 200ms polling, /recv returns single message with X-From-Peer-Id header
+
+**07:30** — 0G docs reviewed (OG-chain.md, OG-storage.md, OG-compute.md). Major updates:
+- Fixed chain RPC, chain ID (16602), EVM version (cancun)
+- 0G Storage: KV uses stream IDs + CLI commands
+- **0G Compute Router discovered**: OpenAI-compatible API at `router-api.0g.ai/v1`
+- LLM decision changed from OpenAI to 0G Compute as default provider
+
+**07:45** — Pushed initial docs + corrections to GitHub: `github.com/rajat-sharma-Dev/Async`
+
+**07:50** — Started Rajat Phase 1 implementation:
+- Scaffolded monorepo (npm workspaces)
+- Created `.gitignore`, `.env.example`
+
+**08:00** — Smart contracts implemented:
+- `AgentNFT.sol`: ERC-721 Enumerable + roles, reputation, earnings, owner enumeration
+- `TaskManager.sol`: Full lifecycle with escrow, bidding, swarm, payments + refunds
+- `Auction.sol`: Time-limited auction with off-chain scoring, cancellation
+
+**08:10** — Hardhat config + deploy script created:
+- Solidity 0.8.24 (bumped from 0.8.19 for OpenZeppelin v5 compat)
+- EVM target: cancun
+- Deploy script outputs addresses for .env
+
+**08:15** — Backend skeleton created:
+- Express + WebSocket server (`packages/backend/src/server.ts`)
+- 0G Storage KV wrapper (`packages/backend/src/storage/zerog.ts`)
+
+**08:20** — AXL node configs created:
+- Node A: `node-config.json` (port 9002)
+- Node B: `node-config-2.json` (port 9012)
+
+**08:25** — ⚠️ Disk space issue (116MB free). Cleaned npm cache → freed 13GB.
+
+**08:30** — All contracts compiled successfully (21 Solidity files, EVM target: cancun).
+
+**08:35** — Pushed everything to GitHub. Rajat Phase 1 complete.
+
+---
+
+## Current Project Structure
+
+```
+agentverse/
+├── .env.example                    ✅ All env vars
+├── .gitignore                      ✅ Complete
+├── package.json                    ✅ npm workspaces root
+├── packages/
+│   ├── contracts/
+│   │   ├── contracts/
+│   │   │   ├── AgentNFT.sol        ✅ Compiled
+│   │   │   ├── TaskManager.sol     ✅ Compiled
+│   │   │   └── Auction.sol         ✅ Compiled
+│   │   ├── scripts/deploy.js       ✅ Ready
+│   │   ├── hardhat.config.js       ✅ 0G testnet + mainnet
+│   │   └── package.json            ✅
+│   ├── backend/
+│   │   ├── src/
+│   │   │   ├── server.ts           ✅ Express + WS skeleton
+│   │   │   └── storage/zerog.ts    ✅ 0G KV wrapper
+│   │   ├── tsconfig.json           ✅
+│   │   └── package.json            ✅
+│   ├── frontend/
+│   │   └── package.json            📎 Placeholder (Phase 3)
+│   └── axl-nodes/
+│       ├── node-config.json        ✅ Node A (port 9002)
+│       ├── node-config-2.json      ✅ Node B (port 9012)
+│       └── README.md               ✅ Setup guide for Pranav
+└── docs/                           ✅ 17 files + tracks-docs/
+```
 
 ---
 
@@ -49,15 +105,20 @@
 
 | Blocker | Owner | Status |
 |---------|-------|--------|
-| AXL docs review needed | Rajat → share docs | ⬜ Pending |
-| LLM provider decision | Rajat | ⬜ Pending |
+| ~~AXL docs review~~ | ~~Rajat~~ | ✅ Done |
+| ~~LLM provider decision~~ | ~~Rajat~~ | ✅ 0G Compute Router |
+| Deploy to 0G testnet | Rajat | ⬜ Needs `PRIVATE_KEY` + faucet tokens |
+| 0G Compute API key | Rajat | ⬜ Get from pc.0g.ai |
+| 0G Storage endpoints | Rajat | ⬜ Need indexer + KV node URLs |
+| KeeperHub/x402 docs | Rajat | ⬜ Need real track docs |
 | Frontend design direction | Rajat | ⬜ Pending |
 
 ---
 
 ## Next Steps
 
-1. Rajat: Share AXL docs for review
-2. Rajat: Begin smart contract development
-3. Pranav: Begin AXL node setup + agent runtime
-4. Both: Finalize shared interfaces
+1. **Rajat:** Get testnet tokens from faucet → deploy contracts → share addresses
+2. **Rajat:** Get 0G Compute API key → test inference
+3. **Pranav:** Clone repo, build AXL binary, start nodes
+4. **Pranav:** Implement agent types, personality, LLM provider, runtime
+5. **Both:** Integration test — agents talking via AXL + thinking via 0G Compute

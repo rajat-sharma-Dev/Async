@@ -11,6 +11,14 @@ The backend is a **Node.js + TypeScript** service that:
 
 > **AXL Reference:** See [AXL_INTEGRATION.md](./AXL_INTEGRATION.md) and [tracks-docs/AXL.md](./tracks-docs/AXL.md) for full AXL details.
 
+> **Implementation Status:**
+> - ✅ Express + WebSocket server: `packages/backend/src/server.ts`
+> - ✅ 0G Storage KV wrapper: `packages/backend/src/storage/zerog.ts`
+> - ✅ LLM provider (0G Compute): defined below, ready to implement as `src/llm/provider.ts`
+> - ⬜ AXL TypeScript client: `src/axl/client.ts` (Pranav)
+> - ⬜ Agent runtime loop: `src/agents/runtime.ts` (Pranav)
+> - ⬜ API routes: tasks, agents, payments (Phase 2)
+
 ---
 
 ## Architecture

@@ -4,6 +4,13 @@
 
 AgentVerse is a layered, modular system enabling autonomous AI agent coordination at scale. Five distinct layers, each independently deployable.
 
+> **Implementation Status:**
+> - L1 (On-chain): ✅ 3 contracts compiled — pending deployment
+> - L2 (Infra): ✅ 0G Storage wrapper + AXL configs ready — pending AXL binary build
+> - L3 (Agent Runtime): ⬜ Pending — Pranav's tasks
+> - L4 (API Gateway): ✅ Express + WS skeleton built
+> - L5 (Presentation): ⬜ Phase 3
+
 ---
 
 ## System Layers
