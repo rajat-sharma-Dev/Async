@@ -209,26 +209,42 @@
 
 ### 🟢 Rajat — Frontend
 
-- [ ] **Vite + React project setup**
-  - 📖 Ref: [FRONTEND.md](./FRONTEND.md)
+- [x] **Vite + React project setup** ✅ Already scaffolded by Pranav, enhanced
+  - ✅ `react-router-dom` + `ethers` added
+  - ✅ Premium design system in `src/styles.css`
 
-- [ ] **Dashboard page** — Task submission, agent grid
-  - 📖 Ref: [USER_FLOW.md](./USER_FLOW.md) → "Flow 2", [FRONTEND.md](./FRONTEND.md)
+- [x] **Dashboard page** — `src/pages/Dashboard.tsx`
+  - ✅ Agent grid with personality bars, role colors, click-to-profile
+  - ✅ Task submission form with budget field
+  - ✅ Live execution panel: subtask progress + on-chain result hash
+  - ✅ Real-time event feed (WebSocket, auto-reconnect)
 
-- [ ] **Live execution view** — Real-time agent messages via WebSocket
-  - 📖 Ref: [BACKEND.md](./BACKEND.md) → "WebSocket Events", [DEMO_FLOW.md](./DEMO_FLOW.md) → "Scene 6"
+- [x] **Live execution view** — WebSocket events streamed, auto-reconnect after 3s
+  - ✅ `src/hooks/useWebSocket.ts` — 300-event rolling buffer, snapshot hydration
+  - ✅ Color-coded events: task/swarm/agent/payment/chain
 
-- [ ] **Agent creation page** — Mint iNFT with personality sliders
-  - 📖 Ref: [USER_FLOW.md](./USER_FLOW.md) → "Flow 1", [AGENT_DESIGN.md](./AGENT_DESIGN.md) → "PersonalityVector"
+- [x] **Agent creation page** — `src/pages/CreateAgent.tsx`
+  - ✅ Role picker grid (5 roles, color-coded)
+  - ✅ Personality sliders (5 traits) with live preview card
+  - ✅ Mints via `POST /api/agents`, redirects to profile
 
-- [ ] **Agent profile page** — Memory, personality, earnings
-  - 📖 Ref: [USER_FLOW.md](./USER_FLOW.md) → "Flow 4"
+- [x] **Agent profile page** — `src/pages/AgentProfile.tsx`
+  - ✅ Personality bars + on-chain identity fields
+  - ✅ Earnings total + payment history list
+  - ✅ Task history + 0G Explorer link
 
-- [ ] **MetaMask wallet integration** — Connect to 0G Chain
-  - 📖 Ref: [USER_GUIDE.md](./USER_GUIDE.md) → "Connect Your Wallet"
+- [x] **MetaMask wallet integration** — `src/hooks/useWallet.ts`
+  - ✅ Connect + auto-switch to 0G Testnet (chain 16602)
+  - ✅ Wrong-chain warning badge
+  - ✅ Balance display (A0GI)
+  - ✅ Account/chain change listeners
 
-- [ ] **UI polish + animations**
-  - 📖 Ref: [DEMO_FLOW.md](./DEMO_FLOW.md) (what needs to look good on video)
+- [x] **UI polish + animations**
+  - ✅ Glassmorphism panels, animated background gradient
+  - ✅ Role color accent bars on agent cards
+  - ✅ Pulse animations for live status dots
+  - ✅ Event slide-in animation, trait bar transition
+  - ✅ Space Grotesk headings, JetBrains Mono for hashes
 
 ### 🔵 Pranav — Demo Tuning
 
