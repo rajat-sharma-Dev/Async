@@ -1,38 +1,57 @@
 # AXL Node Setup
 
+These scripts complete Pranav Phase 1's AXL setup path on Windows.
+
 ## Prerequisites
-- Go 1.25.x (NOT 1.26 — gVisor compatibility issue)
-- OpenSSL (macOS: `brew install openssl`)
+
+- Go 1.25.x on PATH. Do not use Go 1.26 because AXL's gVisor dependency is incompatible.
+- Git on PATH.
+- OpenSSL 3.x on PATH.
 
 ## Setup
 
-```bash
-# Clone and build AXL
-git clone https://github.com/gensyn-ai/axl.git
-cd axl
-go build -o node ./cmd/node/
-
-# Generate identity keys (macOS)
-/opt/homebrew/opt/openssl/bin/openssl genpkey -algorithm ed25519 -out private.pem
-/opt/homebrew/opt/openssl/bin/openssl genpkey -algorithm ed25519 -out private-2.pem
-
-# Copy config files from this directory
-cp ../node-config.json .
-cp ../node-config-2.json .
-
-# Start Node A (terminal 1)
-./node -config node-config.json
-
-# Start Node B (terminal 2)
-./node -config node-config-2.json
+```powershell
+cd packages\axl-nodes
+.\setup-axl.ps1
 ```
 
-## Verify
+The script:
 
-```bash
-# Get Node A key
-curl -s http://127.0.0.1:9002/topology | python3 -c "import sys,json; print(json.load(sys.stdin)['our_public_key'])"
+- clones `https://github.com/gensyn-ai/axl.git` into `packages/axl-nodes/axl`
+- builds `node.exe`
+- copies it to `packages/axl-nodes/node.exe`
+- generates `private.pem` and `private-2.pem`
 
-# Get Node B key
-curl -s http://127.0.0.1:9012/topology | python3 -c "import sys,json; print(json.load(sys.stdin)['our_public_key'])"
+## Start Nodes
+
+```powershell
+.\start-nodes.ps1
 ```
+
+Node A API: `http://127.0.0.1:9002`
+
+Node B API: `http://127.0.0.1:9012`
+
+## Verify Send/Recv
+
+```powershell
+.\verify-axl.ps1
+```
+
+The verification sends a `HEARTBEAT` message from Node B to Node A and reads it back through `/recv`.
+
+## Backend Check
+
+Once both nodes are running:
+
+```powershell
+npm run backend:dev
+```
+
+Then visit:
+
+```text
+http://localhost:3001/api/axl/topology
+```
+
+Expected `mode`: `p2p-mesh`.

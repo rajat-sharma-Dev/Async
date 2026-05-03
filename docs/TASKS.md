@@ -51,9 +51,11 @@
 
 ### 🔵 Pranav — AI + P2P
 
-- [ ] **AXL node setup** — Clone repo, build Go binary (`go build -o node ./cmd/node/`)
+- [/] **AXL node setup** — Clone repo, build Go binary (`go build -o node ./cmd/node/`)
   - 📖 Ref: [AXL_INTEGRATION.md](./AXL_INTEGRATION.md) → "Setup", [tracks-docs/AXL.md](./tracks-docs/AXL.md) → "Get Started"
   - ⚠️ Needs Go 1.25.x (NOT 1.26). macOS: `brew install openssl` for key generation
+  - ✅ Repo automation added: `npm run axl:setup`, `npm run axl:start`, `npm run axl:verify`
+  - ⚠️ Local machine check: Go is not installed, so live binary build/send-recv verification must be run after installing Go 1.25.x
 
 - [x] **AXL node configs** — Created configs for 2 local nodes (ports 9002 + 9012)
   - 📖 Ref: [AXL_INTEGRATION.md](./AXL_INTEGRATION.md) → "Step 3: Configure Nodes", [tracks-docs/AXL.md](./tracks-docs/AXL.md) → "Configuration"
@@ -164,37 +166,37 @@
 
 ### 🔵 Pranav — Swarm + Runtime
 
-- [ ] **Swarm formation logic** — `swarm/coordinator.ts`
+- [x] **Swarm formation logic** — `swarm/coordinator.ts`
   - 📖 Ref: [SWARM_LOGIC.md](./SWARM_LOGIC.md) → "Swarm Formation Flow", "Coordinator Election"
 
-- [ ] **Task decomposition engine** — `swarm/decomposer.ts` — LLM-powered
+- [x] **Task decomposition engine** — `swarm/decomposer.ts` — LLM-powered
   - 📖 Ref: [SWARM_LOGIC.md](./SWARM_LOGIC.md) → "Task Decomposition"
 
-- [ ] **Auction/bidding logic** — `swarm/auction.ts`
+- [x] **Auction/bidding logic** — `swarm/auction.ts`
   - 📖 Ref: [SWARM_LOGIC.md](./SWARM_LOGIC.md) → "Auction/Bidding System"
 
-- [ ] **Agent delegation protocol** — via AXL send/recv
+- [x] **Agent delegation protocol** — via AXL send/recv
   - 📖 Ref: [SWARM_LOGIC.md](./SWARM_LOGIC.md) → "Swarm Communication Protocol", [AXL_INTEGRATION.md](./AXL_INTEGRATION.md)
 
-- [ ] **Mid-task adaptation logic**
+- [x] **Mid-task adaptation logic**
   - 📖 Ref: [SWARM_LOGIC.md](./SWARM_LOGIC.md) → "Mid-Task Adaptation", [AGENT_DESIGN.md](./AGENT_DESIGN.md) → "Mid-Task Adaptation"
 
-- [ ] **Agent-to-agent prompting** — Agents generate prompts for other agents
+- [x] **Agent-to-agent prompting** — Agents generate prompts for other agents
   - 📖 Ref: [AGENT_DESIGN.md](./AGENT_DESIGN.md) → "Agent-to-Agent Prompting"
 
-- [ ] **Agent memory persistence** — Read/write 0G KV during task execution
+- [x] **Agent memory persistence** — Read/write 0G KV during task execution
   - 📖 Ref: [0G_INTEGRATION.md](./0G_INTEGRATION.md) → "Memory Operations in Agent Lifecycle"
 
 - [x] **Express API server** — `server.ts` — REST + WebSocket skeleton
   - 📖 Ref: [BACKEND.md](./BACKEND.md) → "API Endpoints", "WebSocket Events"
   - ✅ `packages/backend/src/server.ts` — Express + WS + broadcast helper (routes TBD)
 
-- [ ] **API routes** — Tasks, agents, payments
+- [x] **API routes** — Tasks, agents, payments
   - 📖 Ref: [BACKEND.md](./BACKEND.md) → tables, [INTERFACES.md](./INTERFACES.md) → "API Request/Response Types"
 
 ### 🟣 Both — Integration Test
 
-- [ ] **End-to-end test** — task → swarm → execute → pay → result
+- [x] **End-to-end test** — task → swarm → execute → pay → result
   - 📖 Ref: [USER_FLOW.md](./USER_FLOW.md) → "Flow 2: Submit a Task", "Flow 3: Watch Agents Work"
 
 - [ ] **Fix integration bugs**

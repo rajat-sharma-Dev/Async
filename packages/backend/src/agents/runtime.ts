@@ -4,6 +4,14 @@ import { AXLRouter, buildAXLMessage, createConfiguredAXLClients } from '../axl/c
 import { createLLMProvider, type LLMProvider } from '../llm/provider.js';
 import { ZeroGMemory } from '../storage/zerog.js';
 import { createSwarm } from '../swarm/auction.js';
+import {
+  assignSubtasks,
+  createDelegationPrompt,
+  getExecutableSubtasks,
+  needsAdaptation,
+  reviewSubtaskOutput,
+  selectAdaptation,
+} from '../swarm/coordinator.js';
 import { decomposeTask } from '../swarm/decomposer.js';
 import {
   buildSystemPrompt,
@@ -238,62 +246,117 @@ export class AgentRuntime {
       }
 
       // ── 5. Decompose task ───────────────────────────────────────────────
-      task.subtasks = await decomposeTask(task, swarmAgents, this.llm);
-      for (const subtask of task.subtasks) {
-        subtask.assignedAgentId =
-          swarmAgents.find((agent) => agent.role === subtask.assignedRole)?.id || swarm.coordinatorAgentId;
-      }
+      task.subtasks = assignSubtasks(await decomposeTask(task, swarmAgents, this.llm), swarmAgents, swarm.coordinatorAgentId);
       this.emit('task:decomposed', { taskId: task.id, subtasks: task.subtasks });
 
       // ── 6. Execute subtasks ─────────────────────────────────────────────
-      for (const subtask of task.subtasks) {
-        const agent = this.agents.get(subtask.assignedAgentId);
-        if (!agent) continue;
-        subtask.status = 'in_progress';
-        subtask.attempts += 1;
+      while (task.subtasks.some((subtask) => subtask.status === 'pending')) {
+        const executable = getExecutableSubtasks(task.subtasks);
+        if (executable.length === 0) {
+          throw new Error(`No executable subtasks for ${task.id}; dependency graph may be cyclic`);
+        }
 
-        // Coordinator delegates via AXL
-        const delegation = buildAXLMessage('DELEGATION', task.coordinatorAgentId, agent.axlPeerId, {
-          subtaskId: subtask.id,
-          title: subtask.title,
-          description: subtask.description,
-        }, task.id);
-        await this.axlRouter.send('node-a', agent.axlPeerId, delegation);
+        for (const subtask of executable) {
+          const agent = this.agents.get(subtask.assignedAgentId);
+          if (!agent) continue;
+          subtask.status = 'in_progress';
+          subtask.attempts += 1;
 
-        this.emit('agent:message', {
-          from: task.coordinatorAgentId,
-          to: agent.id,
-          type: 'DELEGATION',
-          content: subtask.description,
-          timestamp: Date.now(),
-        });
+          const coordinator = this.agents.get(task.coordinatorAgentId) || agent;
+          const priorResults = task.subtasks.filter((candidate) => candidate.status === 'complete');
+          const delegationPrompt = await createDelegationPrompt(
+            { task, subtask, coordinator, targetAgent: agent, priorResults },
+            this.llm,
+          );
 
-        const memory = await this.safeGetAgentMemory(agent.id);
-        const prompt = `${buildSystemPrompt(agent, memory)}
+          // Coordinator delegates via AXL
+          const delegation = buildAXLMessage('DELEGATION', task.coordinatorAgentId, agent.axlPeerId, {
+            subtaskId: subtask.id,
+            title: subtask.title,
+            description: subtask.description,
+            prompt: delegationPrompt,
+          }, task.id);
+          await this.axlRouter.send('node-a', agent.axlPeerId, delegation);
+
+          this.emit('agent:message', {
+            from: task.coordinatorAgentId,
+            to: agent.id,
+            type: 'DELEGATION',
+            content: delegationPrompt,
+            timestamp: Date.now(),
+          });
+
+          const memory = await this.safeGetAgentMemory(agent.id);
+          const prompt = `${buildSystemPrompt(agent, memory)}
 
 Task: ${task.description}
 Subtask: ${subtask.title}
-Subtask detail: ${subtask.description}
+Coordinator prompt:
+${delegationPrompt}
 Return the agent's concrete result in 4-8 bullet points.`;
-        const output = await this.safeComplete(prompt, agent, subtask.title);
-        subtask.result = output;
-        subtask.status = 'complete';
-        this.emit('task:subtaskComplete', { taskId: task.id, subtaskId: subtask.id, result: output });
+          let output = await this.safeComplete(prompt, agent, subtask.title);
+          subtask.result = output;
 
-        // Agent sends result back via AXL
-        const resultMsg = buildAXLMessage('RESULT', agent.axlPeerId, task.coordinatorAgentId, {
-          subtaskId: subtask.id,
-          result: output,
-        }, task.id);
-        await this.axlRouter.send(agent.axlNodeId, task.coordinatorAgentId, resultMsg);
+          // Agent sends result back via AXL
+          const resultMsg = buildAXLMessage('RESULT', agent.axlPeerId, task.coordinatorAgentId, {
+            subtaskId: subtask.id,
+            result: output,
+          }, task.id);
+          await this.axlRouter.send(agent.axlNodeId, task.coordinatorAgentId, resultMsg);
 
-        await this.safeAppendTaskResult(agent.id, {
-          taskId: task.id,
-          subtaskId: subtask.id,
-          role: agent.role,
-          result: output,
-          timestamp: Date.now(),
-        });
+          const reviewer = swarmAgents.find((candidate) => candidate.role === 'critic');
+          if (reviewer && reviewer.id !== agent.id) {
+            const review = await reviewSubtaskOutput(task, subtask, reviewer, this.llm);
+            this.emit('agent:message', {
+              from: reviewer.id,
+              to: task.coordinatorAgentId,
+              type: 'REVIEW_FEEDBACK',
+              content: review,
+              timestamp: Date.now(),
+            });
+
+            if (needsAdaptation(subtask, review)) {
+              const strategy = selectAdaptation(agent, subtask, review);
+              this.emit('agent:adaptation', {
+                agentId: agent.id,
+                subtaskId: subtask.id,
+                strategy,
+                reason: review,
+              });
+
+              if (strategy !== 'ABANDON' && subtask.attempts < 3) {
+                subtask.attempts += 1;
+                const revisionPrompt = `${prompt}
+
+Critic feedback:
+${review}
+
+Adaptation strategy: ${strategy}
+Revise the output once. Keep what works, fix the issue, and return the improved final result.`;
+                output = await this.safeComplete(revisionPrompt, agent, `${subtask.title} revision`);
+                subtask.result = output;
+                this.emit('agent:message', {
+                  from: agent.id,
+                  to: reviewer.id,
+                  type: 'ADAPTATION',
+                  content: `Applied ${strategy} to ${subtask.title}`,
+                  timestamp: Date.now(),
+                });
+              }
+            }
+          }
+
+          subtask.status = 'complete';
+          this.emit('task:subtaskComplete', { taskId: task.id, subtaskId: subtask.id, result: output });
+
+          await this.safeAppendTaskResult(agent.id, {
+            taskId: task.id,
+            subtaskId: subtask.id,
+            role: agent.role,
+            result: output,
+            timestamp: Date.now(),
+          });
+        }
       }
 
       // ── 7. Critic review ────────────────────────────────────────────────

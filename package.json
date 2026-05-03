@@ -14,7 +14,10 @@
     "contracts:test": "npm run test --workspace=packages/contracts",
     "backend:dev": "npm run dev --workspace=packages/backend",
     "frontend:dev": "npm run dev --workspace=packages/frontend",
-    "demo:swarm": "npm exec --workspace=packages/backend -- tsx ../../examples/swarm-demo.ts"
+    "demo:swarm": "npm exec --workspace=packages/backend -- tsx ../../examples/swarm-demo.ts",
+    "axl:setup": "powershell -ExecutionPolicy Bypass -File packages/axl-nodes/setup-axl.ps1",
+    "axl:start": "powershell -ExecutionPolicy Bypass -File packages/axl-nodes/start-nodes.ps1",
+    "axl:verify": "powershell -ExecutionPolicy Bypass -File packages/axl-nodes/verify-axl.ps1"
   },
   "repository": {
     "type": "git",

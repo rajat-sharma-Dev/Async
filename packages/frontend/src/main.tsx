@@ -32,6 +32,8 @@ interface Task {
   subtasks: Subtask[];
   resultHash: string;
   finalResult: string;
+  onChainTaskId?: number;
+  onChainTxHash?: string | null;
 }
 
 interface TimelineEvent {
@@ -39,6 +41,21 @@ interface TimelineEvent {
   event: string;
   data: any;
   timestamp: number;
+}
+
+interface Health {
+  mode: string;
+  contracts?: Record<string, string>;
+  chains?: {
+    agentVerse?: { name: string; chainId: number };
+    payments?: { name: string; chainId: number };
+  };
+  wallet?: { balance?: string; status?: string; reason?: string };
+}
+
+interface AxlTopology {
+  mode: string;
+  nodes: Record<string, { status?: string }>;
 }
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
@@ -63,16 +80,22 @@ function App() {
   );
   const [budget, setBudget] = useState(5);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [health, setHealth] = useState<Health | null>(null);
+  const [topology, setTopology] = useState<AxlTopology | null>(null);
 
   async function refresh() {
-    const [agentRes, taskRes, eventRes] = await Promise.all([
+    const [agentRes, taskRes, eventRes, healthRes, topologyRes] = await Promise.all([
       fetch(`${API_URL}/api/agents`),
       fetch(`${API_URL}/api/tasks`),
       fetch(`${API_URL}/api/events`),
+      fetch(`${API_URL}/api/health`),
+      fetch(`${API_URL}/api/axl/topology`),
     ]);
     setAgents((await agentRes.json()).agents);
     setTasks((await taskRes.json()).tasks);
     setEvents((await eventRes.json()).events);
+    setHealth(await healthRes.json());
+    setTopology(await topologyRes.json());
   }
 
   useEffect(() => {
@@ -121,9 +144,9 @@ function App() {
           <p>0G-native autonomous swarm runtime</p>
         </div>
         <div className="statusPills">
-          <span><Network size={16} /> AXL-ready</span>
-          <span><Brain size={16} /> 0G Compute</span>
-          <span><CircleDollarSign size={16} /> x402 demo</span>
+          <span><Network size={16} /> {topology?.mode || 'AXL checking'}</span>
+          <span><Brain size={16} /> {health?.mode || 'runtime checking'}</span>
+          <span><CircleDollarSign size={16} /> {health?.chains?.payments?.name || 'payments'} {health?.chains?.payments?.chainId || ''}</span>
         </div>
       </section>
 
@@ -155,6 +178,24 @@ function App() {
         </aside>
 
         <section className="workbench">
+          <section className="panel statusPanel">
+            <div className="metric">
+              <span>0G Chain</span>
+              <strong>{health?.chains?.agentVerse?.name || 'Checking'}</strong>
+              <small>Chain {health?.chains?.agentVerse?.chainId || '...'}</small>
+            </div>
+            <div className="metric">
+              <span>Wallet</span>
+              <strong>{health?.wallet?.balance || health?.wallet?.status || 'Checking'}</strong>
+              <small>{health?.wallet?.reason || 'Runtime bridge ready'}</small>
+            </div>
+            <div className="metric">
+              <span>AXL</span>
+              <strong>{topology?.mode || 'Checking'}</strong>
+              <small>{summarizeNodes(topology)}</small>
+            </div>
+          </section>
+
           <form className="panel taskForm" onSubmit={submitTask}>
             <div className="panelHeader">
               <Send size={18} />
@@ -197,7 +238,12 @@ function App() {
                     </article>
                   ))}
                 </div>
-                {activeTask.resultHash && <div className="resultHash">{activeTask.resultHash}</div>}
+                {activeTask.resultHash && (
+                  <div className="resultHash">
+                    <span>{activeTask.resultHash}</span>
+                    {findChainSubmission(events, activeTask.id) && <span>{findChainSubmission(events, activeTask.id)}</span>}
+                  </div>
+                )}
               </>
             ) : (
               <div className="empty">Submit a task to watch agents bid, form a swarm, execute subtasks, and write a final 0G result hash.</div>
@@ -235,6 +281,21 @@ function summarizeEvent(item: TimelineEvent): string {
   if (data.agent?.name) return `${data.agent.name} joined as ${data.agent.role}`;
   if (data.taskId) return `Task ${data.taskId}`;
   return JSON.stringify(data).slice(0, 180);
+}
+
+function summarizeNodes(topology: AxlTopology | null): string {
+  if (!topology) return 'Node status loading';
+  const entries = Object.entries(topology.nodes || {});
+  if (!entries.length) return 'No nodes reported';
+  return entries.map(([node, value]) => `${node}: ${value.status || 'reachable'}`).join(', ');
+}
+
+function findChainSubmission(events: TimelineEvent[], taskId: string): string | null {
+  const event = [...events].reverse().find((item) => item.event === 'chain:resultSubmitted' && item.data?.taskId === taskId);
+  if (!event) return null;
+  if (event.data?.explorer) return `Explorer: ${event.data.explorer}`;
+  if (event.data?.onChainTaskId) return `0G task #${event.data.onChainTaskId}`;
+  return 'On-chain bridge skipped in local mode';
 }
 
 createRoot(document.getElementById('root')!).render(<App />);

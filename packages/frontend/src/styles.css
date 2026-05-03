@@ -154,7 +154,34 @@ meter {
 .workbench {
   display: grid;
   gap: 16px;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto 1fr;
+}
+
+.statusPanel {
+  display: grid;
+  gap: 1px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+}
+
+.metric {
+  background: rgba(255, 255, 255, 0.03);
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 14px;
+}
+
+.metric span,
+.metric small {
+  color: #8e99ad;
+  font-size: 11px;
+}
+
+.metric strong {
+  color: #eef4ff;
+  font-size: 14px;
+  overflow-wrap: anywhere;
 }
 
 .taskForm {
@@ -268,6 +295,8 @@ button:disabled {
   background: #0f131b;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   color: #7ee787;
+  display: grid;
+  gap: 6px;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 12px;
   overflow-wrap: anywhere;
@@ -296,6 +325,10 @@ button:disabled {
 
 @media (max-width: 1120px) {
   .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .statusPanel {
     grid-template-columns: 1fr;
   }
 
