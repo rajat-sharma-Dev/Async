@@ -168,8 +168,8 @@ export class AgentRuntime {
     if (!task) return;
 
     try {
-      // ── 1. Create on 0G Chain (non-blocking) ───────────────────────────
-      void bridgeCreateTask(task.id, task.description, task.budget);
+      // ── 1. Create on 0G Chain (awaited so taskId is available for submitResult) ─
+      await bridgeCreateTask(task.id, task.description, task.budget);
 
       // ── 2. Broadcast task via AXL P2P ──────────────────────────────────
       task.status = 'bidding';
@@ -445,15 +445,15 @@ Revise the output once. Keep what works, fix the issue, and return the improved 
       }
     }
 
-    // Demo payment receipts (no KH key or demo wallets)
+    // Demo payment receipts (no KH key or chain unavailable)
     const share = Number((task.budget / Math.max(agents.length, 1)).toFixed(2));
     for (const agent of agents) {
       const receipt: PaymentReceipt = {
         txHash: `demo-${task.id}-${agent.id}`,
-        from: task.coordinatorAgentId || task.requester,
-        to: agent.id,
+        from: task.requester || task.coordinatorAgentId,
+        to: agent.walletAddress,   // real 0x address, not agent.id
         amount: share,
-        asset: khKey ? 'USDC (Base, pending)' : 'demo',
+        asset: khKey ? 'USDC (Base, pending KH key)' : 'demo',
         timestamp: Date.now(),
         status: 'confirmed',
       };

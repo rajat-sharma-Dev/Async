@@ -147,11 +147,15 @@ export async function createTask(
   description: string, budgetWei: bigint
 ): Promise<{ taskId: number; txHash: string }> {
   const tm = getTaskManager();
-  const tx = await tm.createTask(description, { value: budgetWei });
+  // Cap the on-chain escrow at 0.001 A0GI for testnet demos.
+  // The full user-defined budget is tracked in runtime state;
+  // the escrow just needs to be > 0 to satisfy the contract.
+  const escrowWei = parseEther('0.001');
+  const tx = await tm.createTask(description, { value: escrowWei });
   const receipt = await tx.wait();
-  const event = receipt.logs.find((l: any) => l.fragment?.name === "TaskCreated");
+  const event = receipt.logs.find((l: any) => l.fragment?.name === 'TaskCreated');
   const taskId = event ? Number(event.args[0]) : -1;
-  console.log(`[TaskManager] Task #${taskId} created, budget: ${formatEther(budgetWei)} A0GI`);
+  console.log(`[TaskManager] Task #${taskId} created, escrow: 0.001 A0GI (budget: ${formatEther(budgetWei)} A0GI in runtime)`);
   return { taskId, txHash: receipt.hash };
 }
 
@@ -191,7 +195,8 @@ export async function getBids(taskId: number): Promise<Bid[]> {
 export async function formSwarm(
   taskId: number, coordinatorId: number, memberIds: number[]
 ): Promise<string> {
-  const tx = await getTaskManager().formSwarm(taskId, coordinatorId, memberIds);
+  // ABI: formSwarm(taskId, agentIds[], coordinatorId)
+  const tx = await getTaskManager().formSwarm(taskId, memberIds, coordinatorId);
   const receipt = await tx.wait();
   return receipt.hash;
 }
