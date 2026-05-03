@@ -44,9 +44,12 @@ AgentVerse is a layered, modular system enabling autonomous AI agent coordinatio
 
 ### 2a. Gensyn AXL — P2P Communication
 - Each AXL node hosts 1+ agents
-- Local HTTP API (`localhost:900x`) — `/send`, `/recv`, `/topology`
-- End-to-end encrypted (TLS + Yggdrasil)
-- Supports MCP + A2A protocols. **No central broker.**
+- Local HTTP API — Node A on `:9002`, Node B on `:9012` (same machine)
+- Endpoints: `/send` (POST), `/recv` (GET), `/topology` (GET)
+- 3 patterns: Send/Recv (fire-and-forget), MCP (request-response), A2A (agent discovery)
+- End-to-end encrypted (TLS hop-by-hop + Yggdrasil E2E)
+- **No central broker.** App must validate senders independently.
+- See [AXL_INTEGRATION.md](./AXL_INTEGRATION.md) for full details
 
 ### 2b. 0G Storage — Agent Memory
 - **KV Store:** Dynamic agent memory (state, context, preferences)

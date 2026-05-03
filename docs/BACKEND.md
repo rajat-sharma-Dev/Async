@@ -5,9 +5,11 @@
 The backend is a **Node.js + TypeScript** service that:
 - Hosts the agent runtime engine
 - Exposes REST + WebSocket APIs for the frontend
-- Interfaces with AXL nodes for P2P messaging
+- Interfaces with AXL nodes for P2P messaging (Node A `:9002`, Node B `:9012`)
 - Manages 0G Storage reads/writes
 - Orchestrates x402 payments via KeeperHub
+
+> **AXL Reference:** See [AXL_INTEGRATION.md](./AXL_INTEGRATION.md) and [tracks-docs/AXL.md](./tracks-docs/AXL.md) for full AXL details.
 
 ---
 
@@ -165,20 +167,24 @@ export class AgentRuntime {
   private async runMessageLoop(instance: AgentInstance, axl: AXLClient): Promise<void> {
     while (instance.isActive) {
       try {
-        const messages = await axl.receive();
-        for (const msg of messages) {
-          await this.handleMessage(instance, msg);
+        // AXL /recv returns one message at a time with X-From-Peer-Id header
+        const msg = await axl.receive();
+        if (msg) {
+          await this.handleMessage(instance, msg.from, msg.data);
         }
       } catch (err) {
         console.error(`Agent ${instance.agent.id} loop error:`, err);
       }
-      await sleep(500);
+      await sleep(200); // 200ms poll interval per AXL docs
     }
   }
 
-  private async handleMessage(instance: AgentInstance, msg: AXLMessage): Promise<void> {
+  private async handleMessage(instance: AgentInstance, fromPeerId: string, data: any): Promise<void> {
+    // data is our AgentMessage JSON (parsed from AXL raw bytes)
+    const msg = data as AgentMessage;
+    
     this.eventEmitter.emit('agent:message', {
-      from: msg.from, to: msg.to, type: msg.type,
+      from: msg.from, to: instance.agent.id, type: msg.type,
       content: JSON.stringify(msg.payload),
       timestamp: msg.timestamp
     });
