@@ -65,9 +65,10 @@ For the full architecture, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 ### Prerequisites
 
 - Node.js >= 18
-- Go >= 1.21 (for AXL nodes)
+- Go >= 1.25.x (for AXL nodes — **NOT 1.26**, gVisor compatibility issue)
 - MetaMask or compatible wallet
 - 0G testnet tokens ([faucet](https://faucet.0g.ai))
+- 0G Compute API key ([pc.0g.ai](https://pc.0g.ai/) or [pc.testnet.0g.ai](https://pc.testnet.0g.ai/))
 
 ### Installation
 
@@ -87,7 +88,7 @@ cp .env.example .env
 cd packages/axl-nodes && ./start-nodes.sh
 
 # Deploy smart contracts (0G testnet)
-cd packages/contracts && npx hardhat deploy --network og-testnet
+cd packages/contracts && npx hardhat run scripts/deploy.js --network 0g-testnet
 
 # Start backend
 cd packages/backend && npm run dev
@@ -99,19 +100,28 @@ cd packages/frontend && npm run dev
 ### Environment Variables
 
 ```env
-# LLM
-LLM_PROVIDER=openai
-LLM_API_KEY=your_key
-LLM_MODEL=gpt-4o-mini
+# LLM — 0G Compute Router (decentralized, OpenAI-compatible)
+LLM_PROVIDER=0g
+LLM_BASE_URL=https://router-api.0g.ai/v1
+LLM_API_KEY=sk-your_0g_compute_key
+LLM_MODEL=zai-org/GLM-5-FP8
 
-# 0G
-OG_RPC_URL=https://evm-rpc-testnet.0g.ai
-OG_PRIVATE_KEY=your_private_key
-OG_STORAGE_RPC=https://storage-rpc-testnet.0g.ai
+# LLM — OpenAI fallback (optional)
+# LLM_PROVIDER=openai
+# OPENAI_API_KEY=your_openai_key
+
+# 0G Chain
+PRIVATE_KEY=0x_your_deployer_private_key
+OG_RPC_URL=https://evmrpc-testnet.0g.ai
+OG_CHAIN_ID=16602
+
+# 0G Storage
+STORAGE_INDEXER_URL=your_indexer_endpoint
+STORAGE_KV_NODE_URL=your_kv_node_endpoint
 
 # AXL
-AXL_NODE_PORT=9002
-AXL_CONFIG_PATH=./packages/axl-nodes/node1-config.json
+AXL_NODE_A_PORT=9002
+AXL_NODE_B_PORT=9012
 
 # x402 / KeeperHub
 KEEPER_HUB_API=https://api.keeperhub.com
@@ -174,7 +184,7 @@ agentverse/
 
 ## 🏆 Hackathon Tracks
 
-- **0G:** Agent memory (KV store), iNFTs (ERC-7857), on-chain identity
+- **0G:** Agent memory (KV store), iNFTs (ERC-7857), on-chain identity, **decentralized LLM inference (0G Compute)**
 - **Gensyn AXL:** Peer-to-peer agent communication, decentralized mesh
 - **KeeperHub + x402:** Agent-to-agent micropayments, reliable execution
 

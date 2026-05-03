@@ -288,23 +288,62 @@ contract Auction {
 
 ### Hardhat Config
 
-```typescript
-// packages/contracts/hardhat.config.ts
-import { HardhatUserConfig } from "hardhat/config";
-import "@nomicfoundation/hardhat-toolbox";
+> ⚠️ See [0G_INTEGRATION.md](./0G_INTEGRATION.md) and [tracks-docs/OG-chain.md](./tracks-docs/OG-chain.md) for full chain details.
 
-const config: HardhatUserConfig = {
-  solidity: "0.8.20",
+```javascript
+// packages/contracts/hardhat.config.js
+require("@nomicfoundation/hardhat-verify");
+require("@nomicfoundation/hardhat-toolbox-viem");
+require("dotenv").config();
+
+module.exports = {
+  solidity: {
+    version: "0.8.19",
+    settings: {
+      evmVersion: "cancun", // ⚠️ REQUIRED for 0G Chain
+      optimizer: {
+        enabled: true,
+        runs: 200,
+      },
+    },
+  },
   networks: {
-    "og-testnet": {
-      url: process.env.OG_RPC_URL || "https://evm-rpc-testnet.0g.ai",
-      accounts: [process.env.DEPLOYER_PRIVATE_KEY || ""],
-      chainId: 16600 // 0G testnet chain ID (verify from docs)
-    }
-  }
+    "0g-testnet": {
+      url: "https://evmrpc-testnet.0g.ai",
+      chainId: 16602,
+      accounts: [process.env.PRIVATE_KEY],
+    },
+    "0g-mainnet": {
+      url: "https://evmrpc.0g.ai",
+      chainId: 16661,
+      accounts: [process.env.PRIVATE_KEY],
+    },
+  },
+  etherscan: {
+    apiKey: {
+      "0g-testnet": "placeholder",
+      "0g-mainnet": "placeholder",
+    },
+    customChains: [
+      {
+        network: "0g-testnet",
+        chainId: 16602,
+        urls: {
+          apiURL: "https://chainscan-galileo.0g.ai/open/api",
+          browserURL: "https://chainscan-galileo.0g.ai",
+        },
+      },
+      {
+        network: "0g-mainnet",
+        chainId: 16661,
+        urls: {
+          apiURL: "https://chainscan.0g.ai/open/api",
+          browserURL: "https://chainscan.0g.ai",
+        },
+      },
+    ],
+  },
 };
-
-export default config;
 ```
 
 ### Deployment Script

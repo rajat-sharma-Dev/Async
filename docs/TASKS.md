@@ -28,10 +28,14 @@
   - 📖 Ref: [SMART_CONTRACTS.md](./SMART_CONTRACTS.md) → "Contract 3: Auction", [SWARM_LOGIC.md](./SWARM_LOGIC.md) → "Auction/Bidding System"
 
 - [ ] **Hardhat config for 0G testnet** — Network config, deploy scripts
-  - 📖 Ref: [SMART_CONTRACTS.md](./SMART_CONTRACTS.md) → "Deployment", [0G_INTEGRATION.md](./0G_INTEGRATION.md)
+  - 📖 Ref: [SMART_CONTRACTS.md](./SMART_CONTRACTS.md) → "Deployment", [0G_INTEGRATION.md](./0G_INTEGRATION.md) → "0G Chain"
+  - ⚠️ Must set `evmVersion: "cancun"` in Hardhat config!
+  - Testnet RPC: `https://evmrpc-testnet.0g.ai`, Chain ID: `16602`
+  - Faucet: [faucet.0g.ai](https://faucet.0g.ai/)
 
-- [ ] **0G Storage KV wrapper** — Agent memory read/write via 0G TS SDK
-  - 📖 Ref: [0G_INTEGRATION.md](./0G_INTEGRATION.md) → "0G Storage KV", [INTERFACES.md](./INTERFACES.md) → key schema
+- [ ] **0G Storage KV wrapper** — Agent memory read/write via CLI/SDK
+  - 📖 Ref: [0G_INTEGRATION.md](./0G_INTEGRATION.md) → "0G Storage", [tracks-docs/OG-storage.md](./tracks-docs/OG-storage.md)
+  - Note: Uses stream IDs + comma-separated keys/values. Read uses `--node`, write uses `--indexer`
 
 - [ ] **Environment config** — `.env.example` with all required vars
   - 📖 Ref: [README.md](./README.md) → "Environment Variables"
@@ -56,8 +60,11 @@
 - [ ] **Personality system** — `agents/personality.ts` — personality vector → system prompt
   - 📖 Ref: [AGENT_DESIGN.md](./AGENT_DESIGN.md) → "Personality System", "Personality → System Prompt"
 
-- [ ] **LLM provider abstraction** — `llm/provider.ts` — pluggable LLM (OpenAI, etc.)
-  - 📖 Ref: [BACKEND.md](./BACKEND.md) → "LLM Provider Abstraction"
+- [ ] **LLM provider: 0G Compute Router** — `llm/provider.ts` — **0G Compute as default** (OpenAI drop-in)
+  - 📖 Ref: [0G_INTEGRATION.md](./0G_INTEGRATION.md) → "0G Compute", [tracks-docs/OG-compute.md](./tracks-docs/OG-compute.md) → "Quickstart"
+  - API: `https://router-api.0g.ai/v1` — same as OpenAI API!
+  - Need: API key from [pc.0g.ai](https://pc.0g.ai/) + 0G token deposit
+  - Model: `zai-org/GLM-5-FP8` (supports streaming, tool calling, JSON mode)
 
 - [ ] **Basic agent runtime loop** — `agents/runtime.ts` — poll AXL, think, respond
   - 📖 Ref: [BACKEND.md](./BACKEND.md) → "Agent Runtime Engine", [AGENT_DESIGN.md](./AGENT_DESIGN.md) → "Decision Logic"
@@ -71,7 +78,10 @@
   - 📖 Ref: [AXL_INTEGRATION.md](./AXL_INTEGRATION.md) → "Step 5: Verify + Quick Test"
 
 - [ ] **Test 0G KV read/write** — Verify agent memory persistence
-  - 📖 Ref: [0G_INTEGRATION.md](./0G_INTEGRATION.md) → "TypeScript Client"
+  - 📖 Ref: [0G_INTEGRATION.md](./0G_INTEGRATION.md) → "TypeScript Wrapper"
+
+- [ ] **Test 0G Compute inference** — Verify LLM calls work via 0G Compute Router
+  - 📖 Ref: [0G_INTEGRATION.md](./0G_INTEGRATION.md) → "0G Compute"
 
 **✅ Milestone:** Two agents on separate AXL nodes exchange messages and make LLM-powered decisions.
 

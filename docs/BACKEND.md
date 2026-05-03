@@ -237,6 +237,8 @@ export class AgentRuntime {
 
 ## LLM Provider Abstraction
 
+> **0G Compute Router is the default LLM provider.** It's an OpenAI-compatible API backed by decentralized TEE-verified GPU providers. See [0G_INTEGRATION.md](./0G_INTEGRATION.md) → "0G Compute" for full details.
+
 ```typescript
 // packages/backend/src/llm/provider.ts
 
@@ -245,32 +247,85 @@ export interface LLMProvider {
   chat(messages: ChatMessage[], options?: LLMOptions): Promise<string>;
 }
 
+/**
+ * 0G Compute Router — Decentralized, TEE-verified LLM inference
+ * OpenAI-compatible API at router-api.0g.ai/v1
+ */
+export class ZeroGComputeProvider implements LLMProvider {
+  private baseUrl: string;
+  private apiKey: string;
+
+  constructor() {
+    this.baseUrl = process.env.LLM_BASE_URL || 'https://router-api.0g.ai/v1';
+    this.apiKey = process.env.LLM_API_KEY || '';
+  }
+
+  async complete(prompt: string, options?: LLMOptions): Promise<string> {
+    return this.chat([{ role: 'user', content: prompt }], options);
+  }
+
+  async chat(messages: ChatMessage[], options?: LLMOptions): Promise<string> {
+    const res = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: options?.model || process.env.LLM_MODEL || 'zai-org/GLM-5-FP8',
+        messages,
+        max_tokens: options?.maxTokens || 2000,
+        temperature: options?.temperature || 0.7,
+        verify_tee: true, // Cryptographic proof the model actually ran
+      }),
+    });
+
+    const data = await res.json();
+
+    // Log cost and TEE verification for transparency
+    if (data.x_0g_trace) {
+      console.log(`[0G] Cost: ${data.x_0g_trace.billing?.total_cost} neuron, ` +
+        `TEE: ${data.x_0g_trace.tee_verified}`);
+    }
+
+    return data.choices[0].message.content;
+  }
+}
+
+/**
+ * OpenAI fallback — for testing or if 0G Compute is unavailable
+ */
 export class OpenAIProvider implements LLMProvider {
   async complete(prompt: string, options?: LLMOptions): Promise<string> {
+    return this.chat([{ role: 'user', content: prompt }], options);
+  }
+
+  async chat(messages: ChatMessage[], options?: LLMOptions): Promise<string> {
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.LLM_API_KEY}`,
-        'Content-Type': 'application/json'
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: options?.model || process.env.LLM_MODEL || 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
+        model: options?.model || 'gpt-4o-mini',
+        messages,
         max_tokens: options?.maxTokens || 2000,
-        temperature: options?.temperature || 0.7
-      })
+        temperature: options?.temperature || 0.7,
+      }),
     });
     const data = await res.json();
     return data.choices[0].message.content;
   }
 }
 
-// Easily swap providers
+// Default to 0G Compute — fully decentralized inference
 export function createLLMProvider(): LLMProvider {
-  const provider = process.env.LLM_PROVIDER || 'openai';
+  const provider = process.env.LLM_PROVIDER || '0g';
   switch (provider) {
+    case '0g': return new ZeroGComputeProvider();
     case 'openai': return new OpenAIProvider();
-    default: return new OpenAIProvider();
+    default: return new ZeroGComputeProvider();
   }
 }
 ```
