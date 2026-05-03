@@ -1,12 +1,12 @@
 # 📊 PROGRESS.md — Live Progress Log
 
-## Status: 🟢 Phase 2 Started — Contracts Deployed
+## Status: 🟢 Phase 2 — Rajat Tasks COMPLETE
 
 | Phase | Status | Rajat | Pranav |
 |-------|--------|-------|--------|
-| Docs & Planning | ✅ Complete | All 17 docs written | — |
-| Phase 1: Foundation | 🟡 In Progress | ✅ All tasks done | ⬜ Not started |
-| Phase 2: Swarm + Economy | 🟡 In Progress | ✅ Contracts deployed | ⬜ Not started |
+| Docs & Planning | ✅ Complete | All docs written | — |
+| Phase 1: Foundation | ✅ Complete | All tasks done | ⬜ Not started |
+| Phase 2: Swarm + Economy | 🟡 In Progress | ✅ All Rajat tasks done | ⬜ Not started |
 | Phase 3: Frontend + Demo | ⬜ Not Started | — | — |
 
 ---
@@ -89,6 +89,24 @@
 - `/v1/models` works ✅ (7 models available)
 - `/v1/chat/completions` returns `invalid_api_key` ⚠️
 - May need token deposit activation on pc.0g.ai
+
+**12:06** — 🟢 **Phase 2 Rajat tasks complete:**
+
+Built and verified:
+- `src/types/index.ts` — Shared TypeScript types (Agent, Task, Bid, Swarm, AXL, Payment)
+- `src/contracts/index.ts` — Full ethers.js wrappers for AgentNFT, TaskManager, Auction
+- `src/contracts/*.abi.json` — Extracted from Hardhat artifacts
+- `src/payments/keeperhub.ts` — KeeperHub API client (Direct Execution, Workflows, Analytics)
+- `src/payments/x402.ts` — x402 payment handler with retry + safety thresholds
+- `src/payments/agent-payments.ts` — Payment distribution (equal + reputation-weighted)
+- `src/routes/tasks.ts` — Task REST API (create, bid, swarm, result, pay, fail)
+- `src/routes/agents.ts` — Agent REST API (mint, get, reputation, earnings)
+- `src/llm/provider.ts` — 0G Compute LLM provider (deepseek-v3, GLM-5, etc.)
+- `src/server.ts` — All routes wired, server boots clean
+
+Verified live:
+- `GET /api/health` → status ok, contracts, 10.48 A0GI balance ✅
+- TypeScript: zero errors (`tsc --noEmit`) ✅
 
 ---
 

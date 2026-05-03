@@ -81,9 +81,9 @@
 
 ### 🟣 Both — Integration Test
 
-- [/] **Agree on shared interfaces** — Finalize types in INTERFACES.md
-  - 📖 Ref: [INTERFACES.md](./INTERFACES.md)
-  - 🟡 Types defined in docs; need to create actual `.ts` files
+- [x] **Agree on shared interfaces** — TypeScript types created
+  - ✅ `packages/backend/src/types/index.ts` — Agent, Task, Bid, Swarm, AXL messages, Payment types
+  - ✅ `CONTRACT_ADDRESSES` + `CHAIN_CONFIG` constants included
 
 - [ ] **Test AXL node ↔ backend** — Verify send/recv between two nodes
   - 📖 Ref: [AXL_INTEGRATION.md](./AXL_INTEGRATION.md) → "Step 5: Verify + Quick Test"
@@ -109,34 +109,31 @@
   - ✅ **Auction:** `0xd1519f4495D3b3E79f2F9877e6FfcEc9b1bA3057`
   - Deployer: `0xbc86ca947Ab27b990054870566cfE849C2109D2d` | Gas: 0.02 A0GI
 
-- [ ] **Contract interaction utilities** — ethers.js wrappers for frontend + backend
-  - 📖 Ref: [INTERFACES.md](./INTERFACES.md) → "Contract ABIs"
-  - After deploy: copy ABIs from `packages/contracts/artifacts/` + addresses from deploy output
+- [x] **Contract interaction utilities** — ethers.js wrappers for all 3 contracts
+  - ✅ `packages/backend/src/contracts/index.ts` — AgentNFT, TaskManager, Auction wrappers
+  - ✅ ABIs extracted to `packages/backend/src/contracts/*.abi.json`
+  - ✅ Shared types in `packages/backend/src/types/index.ts`
 
-- [ ] **KeeperHub API client** — `payments/keeperhub.ts` — Direct Execution + Workflow API
-  - 📖 Ref: [KEEPERHUB_X402.md](./KEEPERHUB_X402.md) → "KeeperHub API", [tracks-docs/KeepersHub-completedocs.md](./tracks-docs/KeepersHub-completedocs.md)
-  - API: `https://app.keeperhub.com/api`, Auth: `Bearer kh_...`
-  - Endpoints: `POST /execute/transfer`, `POST /execute/contract-call`
-  - Rate: 60 req/min (direct exec), 100 req/min (API)
+- [x] **KeeperHub API client** — `payments/keeperhub.ts`
+  - ✅ `packages/backend/src/payments/keeperhub.ts`
+  - ✅ Direct Execution: transfer USDC, contract calls, check-and-execute
+  - ✅ Workflow management, execution polling, spend cap analytics
+  - ⏳ Needs `KH_API_KEY` in `.env` for live testing
 
-- [ ] **Agentic Wallet setup** — `@keeperhub/wallet` for agent payments
-  - 📖 Ref: [KEEPERHUB_X402.md](./KEEPERHUB_X402.md) → "Agentic Wallet Setup"
-  - Install: `npx -p @keeperhub/wallet keeperhub-wallet skill install && keeperhub-wallet add`
-  - Creates `~/.keeperhub/wallet.json` (HMAC secret, NOT a private key)
-  - Safety: auto ≤$5, ask ≤$100, block >$100
+- [x] **x402 payment handler** — `payments/x402.ts`
+  - ✅ `packages/backend/src/payments/x402.ts`
+  - ✅ 402 challenge parsing, retry logic, safety threshold checking
 
-- [ ] **x402 payment handler** — `payments/x402.ts` — handle HTTP 402 challenges
-  - 📖 Ref: [KEEPERHUB_X402.md](./KEEPERHUB_X402.md) → "x402 Protocol"
-  - Payments settle on **Base USDC** (chain 8453, token `0x833589fCD...`)
-  - Agent pays USDC only — NO gas needed (facilitator pays gas)
-  - Per-transfer cap: 100 USDC, daily cap: 200 USDC
+- [x] **Payment distribution** — `payments/agent-payments.ts` — coordinator → workers
+  - ✅ `packages/backend/src/payments/agent-payments.ts`
+  - ✅ Equal share + reputation-weighted distribution strategies
 
-- [ ] **Payment distribution** — `payments/agent-payments.ts` — coordinator → workers
-  - 📖 Ref: [KEEPERHUB_X402.md](./KEEPERHUB_X402.md) → "Payment Flows in AgentVerse"
-  - Uses KeeperHub Direct Execution `POST /execute/transfer`
-
-- [ ] **On-chain task creation from backend** — API routes for task lifecycle
-  - 📖 Ref: [SMART_CONTRACTS.md](./SMART_CONTRACTS.md) → "TaskManager.sol", [BACKEND.md](./BACKEND.md) → "API Endpoints: Tasks"
+- [x] **On-chain task creation from backend** — full REST API
+  - ✅ `packages/backend/src/routes/tasks.ts` — create, get, bid, swarm, result, pay, fail
+  - ✅ `packages/backend/src/routes/agents.ts` — mint, get, reputation, earnings
+  - ✅ `packages/backend/src/llm/provider.ts` — 0G Compute deepseek-v3 provider
+  - ✅ `packages/backend/src/server.ts` — all routes wired, server boots clean
+  - ✅ Health check verified live: `GET /api/health` returns contracts + 10.48 A0GI balance
 
 ### 🔵 Pranav — Swarm + Runtime
 
