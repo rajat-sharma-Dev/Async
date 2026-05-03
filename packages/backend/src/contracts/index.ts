@@ -91,17 +91,11 @@ export async function mintAgent(
   to: string, name: string, role: AgentRole, metadataURI: string
 ): Promise<{ tokenId: number; txHash: string }> {
   const nft = getAgentNFT();
-  // ABI: mintAgent(name: string, role: string, metadataUri: string)
-  // Contract mints to msg.sender (deployer/signer). `to` param is ignored by contract.
-  const ROLE_STRINGS: Record<number, string> = {
-    0: 'coordinator', 1: 'developer', 2: 'researcher', 3: 'critic', 4: 'trader',
-  };
-  const roleStr = ROLE_STRINGS[role as number] ?? 'developer';
-  const tx = await nft.mintAgent(name, roleStr, metadataURI);
+  const tx = await nft.mintAgent(to, name, role, metadataURI);
   const receipt = await tx.wait();
-  const event = receipt.logs.find((l: any) => l.fragment?.name === 'AgentRegistered');
+  const event = receipt.logs.find((l: any) => l.fragment?.name === "AgentRegistered");
   const tokenId = event ? Number(event.args[0]) : -1;
-  console.log(`[AgentNFT] Minted #${tokenId} "${name}" role=${roleStr} signer=${to}`);
+  console.log(`[AgentNFT] Minted #${tokenId} "${name}" → ${to}`);
   return { tokenId, txHash: receipt.hash };
 }
 

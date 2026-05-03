@@ -448,17 +448,12 @@ Revise the output once. Keep what works, fix the issue, and return the improved 
     // Demo payment receipts (no KH key or chain unavailable)
     const share = Number((task.budget / Math.max(agents.length, 1)).toFixed(2));
     for (const agent of agents) {
-      // Generate realistic-looking BaseScan tx hash
-      const chars = '0123456789abcdef';
-      let fakeTx = '0x';
-      for (let i = 0; i < 64; i++) fakeTx += chars[Math.floor(Math.random() * 16)];
-
       const receipt: PaymentReceipt = {
-        txHash: fakeTx,
+        txHash: `demo-${task.id}-${agent.id}`,
         from: task.requester || task.coordinatorAgentId,
-        to: agent.walletAddress,   // real 0x address
+        to: agent.walletAddress,   // real 0x address, not agent.id
         amount: share,
-        asset: 'USDC (Base)',
+        asset: khKey ? 'USDC (Base, pending KH key)' : 'demo',
         timestamp: Date.now(),
         status: 'confirmed',
       };
@@ -470,10 +465,9 @@ Revise the output once. Keep what works, fix the issue, and return the improved 
   private async safeComplete(prompt: string, agent: Agent, fallbackTitle: string): Promise<string> {
     try {
       return await this.llm.complete(prompt, { maxTokens: 800, temperature: 0.35 });
-    } catch {
-      // Return rich, role-specific demo output instead of a bare error string
-      const { getDemoAnswer } = await import('../demo/answers.js');
-      return getDemoAnswer(agent.role, fallbackTitle);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      return `${agent.name} completed "${fallbackTitle}" in local demo mode. Live 0G Compute call was skipped or unavailable: ${reason}`;
     }
   }
 

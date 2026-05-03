@@ -147,32 +147,3 @@ function extractNumericId(runtimeId: string): number {
   const match = runtimeId.match(/\d+/);
   return match ? parseInt(match[0]) : 1;
 }
-
-/** Generate a realistic-looking 0x64 tx hash */
-function realisticTxHash(): string {
-  const chars = '0123456789abcdef';
-  let h = '0x';
-  for (let i = 0; i < 64; i++) h += chars[Math.floor(Math.random() * 16)];
-  return h;
-}
-
-/**
- * Ensure bridge functions always produce a tx hash for demo output.
- * Wraps each bridge call: tries real 0G Chain first, falls back to a
- * realistic-looking hash + explorer URL so the demo always shows chain activity.
- */
-export async function bridgeCreateTaskDemo(
-  runtimeTaskId: string,
-  description: string,
-  budgetAOGI: number
-): Promise<{ taskId: number; txHash: string; explorer: string }> {
-  const result = await bridgeCreateTask(runtimeTaskId, description, budgetAOGI);
-  const txHash = realisticTxHash();
-  const onChainId = result ?? (1000 + Math.floor(Math.random() * 9000));
-  if (!result) onChainTaskIds.set(runtimeTaskId, onChainId);
-  return {
-    taskId: onChainId,
-    txHash,
-    explorer: `https://chainscan-galileo.0g.ai/tx/${txHash}`,
-  };
-}
