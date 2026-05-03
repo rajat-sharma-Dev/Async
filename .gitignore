@@ -12,6 +12,9 @@ typechain-types/
 
 # AXL
 packages/axl-nodes/node
+packages/axl-nodes/node.exe
+packages/axl-nodes/.tools/
+packages/axl-nodes/axl/
 packages/axl-nodes/private*.pem
 
 # OS
@@ -25,3 +28,10 @@ Thumbs.db
 # Coverage
 coverage/
 coverage.json
+
+# Test outputs
+*.output.json
+events_output.json
+
+# Vercel
+.vercel/
