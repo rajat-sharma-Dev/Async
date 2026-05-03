@@ -166,42 +166,85 @@
 
 ### 🔵 Pranav — Swarm + Runtime
 
-- [x] **Swarm formation logic** — `swarm/coordinator.ts`
-  - 📖 Ref: [SWARM_LOGIC.md](./SWARM_LOGIC.md) → "Swarm Formation Flow", "Coordinator Election"
+- [x] **Swarm formation logic** — `swarm/coordinator.ts` + `swarm/auction.ts`
+  - ✅ `scoreBid(bid)` — scores each agent bid: `confidence × roleBonus × (1 - priceRatio)`
+  - ✅ `createSwarm(task, bids)` — selects top 4 winners with role diversity constraint
+  - ✅ `electCoordinator(members)` — picks agent with `coordinator` role, or highest bid score
+  - ✅ `assignSubtasks(subtasks, swarmAgents, coordinatorId)` — direct role match first, then `evaluateRoleMatch()` ranking fallback
+  - ✅ `AdaptationStrategy` enum: ITERATE / PIVOT / DELEGATE / SPLIT / ESCALATE / ABANDON
 
-- [x] **Task decomposition engine** — `swarm/decomposer.ts` — LLM-powered
-  - 📖 Ref: [SWARM_LOGIC.md](./SWARM_LOGIC.md) → "Task Decomposition"
+- [x] **Task decomposition engine** — `swarm/decomposer.ts`
+  - ✅ Calls 0G Compute LLM: `"Decompose this task into 3-4 subtasks as JSON array"`
+  - ✅ Returns subtasks with: `id, title, description, assignedRole, dependencies[], status`
+  - ✅ Deterministic fallback: generates 4 template subtasks (research → implement → review → integrate) when LLM unavailable
+  - ✅ Dependencies array enables sequential execution (e.g. "implement" depends on "research")
 
-- [x] **Auction/bidding logic** — `swarm/auction.ts`
-  - 📖 Ref: [SWARM_LOGIC.md](./SWARM_LOGIC.md) → "Auction/Bidding System"
+- [x] **Auction/bidding logic** — `swarm/auction.ts` + `agents/runtime.ts`
+  - ✅ Each agent calls `shouldBidOnTask(task, agent)` → returns `{ shouldBid, bidPrice, confidence }`
+  - ✅ Bid price = `task.budget × (0.15–0.35)` shaped by `costSensitivity` personality trait
+  - ✅ Confidence = `roleMatchScore × thoroughness × (1 - riskPenalty)`
+  - ✅ Bids broadcast via AXL `BID` message type, collected by coordinator
+  - ✅ Auction closes after all agents respond or 2s timeout
 
-- [x] **Agent delegation protocol** — via AXL send/recv
-  - 📖 Ref: [SWARM_LOGIC.md](./SWARM_LOGIC.md) → "Swarm Communication Protocol", [AXL_INTEGRATION.md](./AXL_INTEGRATION.md)
+- [x] **Agent delegation protocol** — `swarm/coordinator.ts` + `axl/client.ts`
+  - ✅ `createDelegationPrompt(input, llm)` — LLM generates delegation instructions including: prior completed subtask results, target agent's role/personality, coordinator identity
+  - ✅ Coordinator sends `DELEGATION` AXL message to each assigned agent's `axlPeerId`
+  - ✅ Agent receives task, calls `thinkAndRespond(subtask, systemPrompt)` → generates result via 0G Compute
+  - ✅ Agent sends `RESULT` AXL message back to coordinator with output
 
-- [x] **Mid-task adaptation logic**
-  - 📖 Ref: [SWARM_LOGIC.md](./SWARM_LOGIC.md) → "Mid-Task Adaptation", [AGENT_DESIGN.md](./AGENT_DESIGN.md) → "Mid-Task Adaptation"
+- [x] **Mid-task adaptation logic** — `swarm/coordinator.ts` + `agents/runtime.ts`
+  - ✅ `needsAdaptation(subtask, result)` — checks if result is empty, too short, or contains error markers
+  - ✅ `selectAdaptation(subtask, agent)` — picks strategy: reattempt (ITERATE) or assign different agent (DELEGATE)
+  - ✅ `reviewSubtaskOutput(subtask, result, critic)` — critic agent reviews each output for quality
+  - ✅ `getExecutableSubtasks(subtasks)` — dependency-aware: only runs subtasks whose `dependencies[]` are all `complete`
+  - ✅ Deadlock detection: throws if pending subtasks exist but none are executable (cyclic deps)
 
-- [x] **Agent-to-agent prompting** — Agents generate prompts for other agents
-  - 📖 Ref: [AGENT_DESIGN.md](./AGENT_DESIGN.md) → "Agent-to-Agent Prompting"
+- [x] **Agent-to-agent prompting** — `agents/runtime.ts` + `swarm/coordinator.ts`
+  - ✅ Each agent's LLM call uses `buildSystemPrompt(agent)` — injects role, personality traits as floats, and behavioral directives
+  - ✅ Delegation prompt includes: `priorResults[]` (prior subtask outputs), coordinator name, target agent name + role
+  - ✅ Critic agent receives: original subtask description + agent output → returns `{ pass: bool, feedback: string }`
+  - ✅ Failed critic review triggers re-delegation with feedback appended to prompt
 
-- [x] **Agent memory persistence** — Read/write 0G KV during task execution
-  - 📖 Ref: [0G_INTEGRATION.md](./0G_INTEGRATION.md) → "Memory Operations in Agent Lifecycle"
+- [x] **Agent memory persistence** — `storage/zerog.ts`
+  - ✅ `ZeroGMemory` class wraps 0G Storage KV node (`STORAGE_KV_NODE_URL`)
+  - ✅ `getAgentMemory(agentId)` — fetches agent's past task history from 0G KV
+  - ✅ `appendTaskResult(agentId, taskId, result)` — writes subtask result to KV after completion
+  - ✅ Memory injected into agent system prompt context for continuity across tasks
+  - ⏳ Requires `STORAGE_KV_NODE_URL` in `.env` (0G Storage node) for live persistence; skips gracefully if absent
 
-- [x] **Express API server** — `server.ts` — REST + WebSocket skeleton
-  - 📖 Ref: [BACKEND.md](./BACKEND.md) → "API Endpoints", "WebSocket Events"
-  - ✅ `packages/backend/src/server.ts` — Express + WS + broadcast helper (routes TBD)
+- [x] **Agent runtime loop** — `agents/runtime.ts` (511 lines)
+  - ✅ `runTaskLifecycle(task)` — full state machine: open → bidding → swarm formation → decompose → execute → review → completed
+  - ✅ Dependency-aware `while (pending)` execution: runs all unblocked subtasks per round
+  - ✅ Each subtask: `delegation prompt → LLM response → AXL RESULT message → critic review → bridge result`
+  - ✅ 5 seeded agents bootstrapped at startup (Architect, NovaCoder, InfoHound, QualityGate, PennyWise)
+  - ✅ All lifecycle events emitted: `task:created`, `task:bidding`, `swarm:formed`, `task:decomposed`, `agent:thinking`, `agent:message`, `task:completed`, `chain:resultSubmitted`, `payment:distributed`
 
-- [x] **API routes** — Tasks, agents, payments
-  - 📖 Ref: [BACKEND.md](./BACKEND.md) → tables, [INTERFACES.md](./INTERFACES.md) → "API Request/Response Types"
+- [x] **Express API + WebSocket server** — `server.ts`
+  - ✅ `GET /api/health` — live chain + wallet balance + AXL mode
+  - ✅ `GET|POST /api/agents` — list agents / mint new agent
+  - ✅ `GET /api/agents/:id` — agent profile, earnings, task history
+  - ✅ `GET|POST /api/tasks` — list tasks / submit new task (triggers full swarm lifecycle)
+  - ✅ `GET /api/events` — paginated event log
+  - ✅ `GET /api/payments` — all payment receipts
+  - ✅ `GET /api/axl/topology` — AXL node reachability status
+  - ✅ `POST /api/llm/chat` — direct LLM prompt endpoint
+  - ✅ WebSocket: sends `snapshot` on connect (current agents, tasks, events), then streams all runtime events live
 
-### 🟣 Both — Integration Test
+### 🟣 Both — Integration
 
-- [x] **End-to-end test** — task → swarm → execute → pay → result
-  - 📖 Ref: [USER_FLOW.md](./USER_FLOW.md) → "Flow 2: Submit a Task", "Flow 3: Watch Agents Work"
+- [x] **Runtime → 0G Chain bridge** — every task lifecycle step anchored on-chain
+  - ✅ `bridgeCreateTask()` → `TaskManager.createTask()` on 0G Chain, returns numeric on-chain task ID
+  - ✅ `bridgeFormSwarm()` → `TaskManager.formSwarm()` with agent IDs
+  - ✅ `bridgeSubmitResult()` → `TaskManager.submitResult("0g://result/sha256...")` — **THE KEY BRIDGE**
+  - ✅ Explorer link emitted: `https://chainscan-galileo.0g.ai/tx/{hash}`
+  - ✅ Gracefully skips (no-op) when RPC unavailable, runtime continues
 
-- [ ] **Fix integration bugs**
+- [x] **KeeperHub + AXL wired into runtime**
+  - ✅ `KH_API_KEY` present → `distributeTaskPayment()` → real USDC on Base per agent
+  - ✅ No key → demo receipts with same structure
+  - ✅ AXL real HTTP when nodes reachable, in-process EventEmitter when offline
 
-**✅ Milestone:** Full task lifecycle works — submit, bid, swarm, execute, pay, result.
+**✅ Milestone:** Full task lifecycle: submit task → agents bid → swarm forms → subtasks decomposed → dependency-aware execution → critic review → result hash stored on 0G Chain → USDC payments distributed.
 
 ---
 
@@ -246,32 +289,50 @@
   - ✅ Event slide-in animation, trait bar transition
   - ✅ Space Grotesk headings, JetBrains Mono for hashes
 
-### 🔵 Pranav — Demo Tuning
+### 🔵 Pranav — Phase 3 (Swarm Tuning)
+
+- [x] **Dependency-aware subtask execution** — `swarm/coordinator.ts`
+  - ✅ `assignSubtasks()` — direct role match, ranked fallback via `evaluateRoleMatch()`
+  - ✅ `getExecutableSubtasks()` — respects dependency graph (waits for prerequisites)
+  - ✅ `createDelegationPrompt()` — LLM-generated delegation instructions with prior results context
+  - ✅ `AdaptationStrategy` enum: ITERATE / PIVOT / DELEGATE / SPLIT / ESCALATE / ABANDON
+
+- [x] **Runtime dependency loop** — `agents/runtime.ts`
+  - ✅ `while (pending subtasks)` loop instead of linear `for` loop
+  - ✅ Runs all executable subtasks in parallel per round
+  - ✅ Coordinator delegation prompts include prior completed subtask results
+  - ✅ Deadlock detection: throws if 0 executable subtasks and some still pending
+
+- [x] **AXL node scripts** — `packages/axl-nodes/`
+  - ✅ `setup-axl.ps1` — downloads + installs AXL binary
+  - ✅ `start-nodes.ps1` — starts both nodes (9002, 9012) in background
+  - ✅ `verify-axl.ps1` — checks node connectivity and topology
 
 - [ ] **Demo scenario end-to-end test**
-  - 📖 Ref: [DEMO_FLOW.md](./DEMO_FLOW.md) — full scene-by-scene script
+  - Ref: [DEMO_FLOW.md](./DEMO_FLOW.md) — run backend + frontend together
+  - Status: Backend boots, frontend at http://127.0.0.1:5173, needs live run-through
 
-- [ ] **Tune agent personalities** — Make demo compelling
-  - 📖 Ref: [AGENT_DESIGN.md](./AGENT_DESIGN.md) → "Personality System"
+- [ ] **Tune agent personalities** — for demo impact
+  - Adjust bid competitiveness for compelling swarm formation in live demo
 
-- [ ] **Tune task decomposition prompts**
-  - 📖 Ref: [SWARM_LOGIC.md](./SWARM_LOGIC.md) → "Decomposition Engine"
+### 🟣 Both — Remaining
 
-- [ ] **Performance optimization** — Caching, concurrency
-  - 📖 Ref: [0G_INTEGRATION.md](./0G_INTEGRATION.md) → "Caching Strategy"
+- [ ] **Activate 0G Compute** — 🔴 RAJAT ACTION REQUIRED
+  - Deposit A0GI at [pc.0g.ai](https://pc.0g.ai/) against existing API key
+  - Without this: all LLM calls run deterministic fallback, not live AI
 
-### 🟣 Both — Final
+- [ ] **Get KeeperHub key** — 🔴 RAJAT ACTION REQUIRED
+  - Get `kh_...` org key from [app.keeperhub.com](https://app.keeperhub.com)
+  - Add `KH_API_KEY=kh_...` to `.env`
+  - Without this: payments use demo receipts, not real USDC on Base
 
-- [ ] **Documentation cleanup**
-  - 📖 Ref: All .md files in docs/
-
+- [ ] **Task detail page** (`/tasks/:id`) — optional but good for demo
+- [ ] **Payments log page** (`/payments`) — shows x402 receipt history
+- [ ] **Documentation cleanup** — Update README.md with demo instructions
 - [ ] **Demo video recording**
-  - 📖 Ref: [DEMO_FLOW.md](./DEMO_FLOW.md)
 
-- [ ] **Submission preparation**
-  - 📖 Ref: [TRACK_MAPPING.md](./TRACK_MAPPING.md) (for track-specific talking points)
-
-**✅ Milestone:** Polished, demoable MVP with video.
+**✅ Current Milestone:** Full-stack system running, all tracks wired, all code deployed. Zero TypeScript errors. Ready for demo run.
+**🎯 Next Milestone:** Live LLM inference + real USDC payments (requires external keys).
 
 ---
 
