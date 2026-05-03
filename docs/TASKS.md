@@ -112,16 +112,21 @@
   - ✅ In-process EventEmitter fallback when nodes are offline
   - ✅ `GET /api/axl/topology` endpoint shows node status
 
-- [x] **KeeperHub payments wired** — `src/agents/runtime.ts`
+- [x] **KeeperHub payments wired** — `src/agents/runtime.ts` + `payments/agent-payments.ts`
   - ✅ Uses `distributeTaskPayment()` → KeeperHub `payAgent()` when `KH_API_KEY` is set
-  - ✅ Falls back to demo receipts when no key
-  - ⏳ Needs real agent wallet addresses (not `demo-wallet-*`) for live payments
+  - ✅ Falls back to demo receipts (same structure) when no key
+  - ✅ All 5 agents now have real `0x` wallet addresses (no more `demo-wallet-*`)
+  - ✅ `x402.ts` complete — actually calls `payAgent()` on 402 challenges, not an empty retry loop
 
-- [ ] **0G Compute inference live** — needs deposit on pc.0g.ai
-  - ⏳ API key `sk-a2864179...` configured, deposit pending
+- [ ] **0G Compute inference live** — 🔴 RAJAT ACTION REQUIRED
+  - API key `sk-a2864179...` is configured in `.env` and working
+  - **Missing:** deposit A0GI at [pc.0g.ai](https://pc.0g.ai/) against this key
+  - Without deposit: all agent LLM calls use deterministic fallback (still runs, not real AI)
 
-- [ ] **KeeperHub key** — needs `kh_` org-scoped key from app.keeperhub.com
-  - ⏳ Set `KH_API_KEY=kh_...` in `.env` to activate live USDC payments
+- [ ] **KeeperHub org API key** — 🔴 RAJAT ACTION REQUIRED
+  - **Missing:** get `kh_...` key from [app.keeperhub.com](https://app.keeperhub.com) → Settings → API Keys
+  - Add `KH_API_KEY=kh_...` to `.env`
+  - Without this: payments use demo receipts instead of real Base USDC transfers
 
 **✅ Milestone:** Two agents on separate AXL nodes exchange messages and make LLM-powered decisions.
 
