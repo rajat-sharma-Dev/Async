@@ -44,9 +44,10 @@
   - 📖 Ref: [README.md](./README.md) → "Environment Variables"
   - ✅ Covers: 0G Chain/Storage/Compute, AXL, KeeperHub, contract addresses, frontend
 
-> **⚠️ NOT YET DEPLOYED.** Contracts are compiled but not deployed to 0G testnet.
-> Blocked on: (1) `PRIVATE_KEY` in `.env`, (2) testnet tokens from [faucet.0g.ai](https://faucet.0g.ai/).
-> To deploy: `cp .env.example .env` → add key → `npm run contracts:deploy`
+> **✅ DEPLOYED TO 0G TESTNET** (Chain ID: 16602)
+> - AgentNFT: `0xD940B3Dec08366D4f4977eFbb2281B146aee5F69`
+> - TaskManager: `0xd1A98cA6db8E122e2Bd23aD0915d654b3BeB27b1`
+> - Auction: `0xd1519f4495D3b3E79f2F9877e6FfcEc9b1bA3057`
 
 ### 🔵 Pranav — AI + P2P
 
@@ -101,10 +102,12 @@
 
 ### 🟢 Rajat — Contracts + Payments
 
-- [ ] **Deploy contracts to 0G testnet** — Fund wallet, deploy 3 contracts, record addresses
+- [x] **Deploy contracts to 0G testnet** — All 3 contracts live!
   - 📖 Ref: [SMART_CONTRACTS.md](./SMART_CONTRACTS.md) → "Deployment"
-  - ⚠️ Needs `PRIVATE_KEY` in `.env` + testnet tokens from [faucet.0g.ai](https://faucet.0g.ai/)
-  - Run: `npm run contracts:deploy`
+  - ✅ **AgentNFT:** `0xD940B3Dec08366D4f4977eFbb2281B146aee5F69`
+  - ✅ **TaskManager:** `0xd1A98cA6db8E122e2Bd23aD0915d654b3BeB27b1`
+  - ✅ **Auction:** `0xd1519f4495D3b3E79f2F9877e6FfcEc9b1bA3057`
+  - Deployer: `0xbc86ca947Ab27b990054870566cfE849C2109D2d` | Gas: 0.02 A0GI
 
 - [ ] **Contract interaction utilities** — ethers.js wrappers for frontend + backend
   - 📖 Ref: [INTERFACES.md](./INTERFACES.md) → "Contract ABIs"

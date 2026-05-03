@@ -1,6 +1,7 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("@nomicfoundation/hardhat-verify");
-require("dotenv").config({ path: "../../.env" });
+const path = require("path");
+require("dotenv").config({ path: path.resolve(__dirname, "../../.env") });
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
@@ -19,12 +20,12 @@ module.exports = {
     "og-testnet": {
       url: "https://evmrpc-testnet.0g.ai",
       chainId: 16602,
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      accounts: process.env.PRIVATE_KEY ? [`0x${process.env.PRIVATE_KEY.replace(/^0x/, '')}`] : [],
     },
     "og-mainnet": {
       url: "https://evmrpc.0g.ai",
       chainId: 16661,
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      accounts: process.env.PRIVATE_KEY ? [`0x${process.env.PRIVATE_KEY.replace(/^0x/, '')}`] : [],
     },
   },
   etherscan: {

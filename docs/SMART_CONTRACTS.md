@@ -8,9 +8,15 @@ All contracts deploy on **0G Chain** (EVM-compatible L2). Three core contracts:
 2. **TaskManager** — Task lifecycle + budget management
 3. **Auction** — Time-limited auction for task assignment
 
-> **✅ Implementation Status:** All 3 contracts compiled (Solidity 0.8.24, EVM cancun).
-> Source: `packages/contracts/contracts/`. Deploy: `npm run contracts:deploy`.
-> ⚠️ Pending: deployment to 0G testnet (needs PRIVATE_KEY + faucet tokens).
+> **✅ DEPLOYED TO 0G TESTNET** (Solidity 0.8.24, EVM cancun)
+> | Contract | Address |
+> |----------|---------|
+> | AgentNFT | `0xD940B3Dec08366D4f4977eFbb2281B146aee5F69` |
+> | TaskManager | `0xd1A98cA6db8E122e2Bd23aD0915d654b3BeB27b1` |
+> | Auction | `0xd1519f4495D3b3E79f2F9877e6FfcEc9b1bA3057` |
+>
+> Explorer: [chainscan-galileo.0g.ai](https://chainscan-galileo.0g.ai/)
+> Deployer: `0xbc86ca947Ab27b990054870566cfE849C2109D2d` | Gas: 0.02 A0GI
 
 ---
 

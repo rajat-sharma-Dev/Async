@@ -1,12 +1,12 @@
 # 📊 PROGRESS.md — Live Progress Log
 
-## Status: 🟢 Phase 1 — Rajat Tasks Complete
+## Status: 🟢 Phase 2 Started — Contracts Deployed
 
 | Phase | Status | Rajat | Pranav |
 |-------|--------|-------|--------|
 | Docs & Planning | ✅ Complete | All 17 docs written | — |
 | Phase 1: Foundation | 🟡 In Progress | ✅ All tasks done | ⬜ Not started |
-| Phase 2: Swarm + Economy | ⬜ Not Started | — | — |
+| Phase 2: Swarm + Economy | 🟡 In Progress | ✅ Contracts deployed | ⬜ Not started |
 | Phase 3: Frontend + Demo | ⬜ Not Started | — | — |
 
 ---
@@ -65,6 +65,30 @@
 **08:30** — All contracts compiled successfully (21 Solidity files, EVM target: cancun).
 
 **08:35** — Pushed everything to GitHub. Rajat Phase 1 complete.
+
+**11:05** — KeeperHub docs reviewed (2854 lines). Major updates:
+- KEEPERHUB_X402.md rewritten from real docs
+- x402 settles on Base USDC (chain 8453) — agents pay NO gas
+- Agentic Wallet via @keeperhub/wallet (Turnkey custody)
+- Direct Execution API for transfers + contract calls
+- TRACK_MAPPING.md updated with 0G Compute as core component
+
+**11:17** — LLM decision finalized: **0G Compute Router only**
+- API: `router-api.0g.ai/v1` (OpenAI-compatible)
+- Models: DeepSeek V3, GLM-5, Qwen3, etc. — all TEE-verified
+- Zero centralized dependencies
+
+**11:37** — 🎉 **CONTRACTS DEPLOYED TO 0G TESTNET!**
+- AgentNFT: `0xD940B3Dec08366D4f4977eFbb2281B146aee5F69`
+- TaskManager: `0xd1A98cA6db8E122e2Bd23aD0915d654b3BeB27b1`
+- Auction: `0xd1519f4495D3b3E79f2F9877e6FfcEc9b1bA3057`
+- Deployer: `0xbc86ca947Ab27b990054870566cfE849C2109D2d`
+- Gas spent: 0.02 A0GI | Remaining: 10.48 A0GI
+
+**11:38** — 0G Compute API key tested:
+- `/v1/models` works ✅ (7 models available)
+- `/v1/chat/completions` returns `invalid_api_key` ⚠️
+- May need token deposit activation on pc.0g.ai
 
 ---
 
