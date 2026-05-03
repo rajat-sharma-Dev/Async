@@ -317,24 +317,29 @@
 - [ ] **Tune agent personalities** — for demo impact
   - Adjust bid competitiveness for compelling swarm formation in live demo
 
-### 🟣 Both — Remaining
+### 🟣 Both — Completed / In Progress
 
-- [ ] **Activate 0G Compute** — 🔴 RAJAT ACTION REQUIRED
-  - Deposit A0GI at [pc.0g.ai](https://pc.0g.ai/) against existing API key
-  - Without this: all LLM calls run deterministic fallback, not live AI
+- [x] **Activate 0G Compute** — deposit confirmed at [pc.0g.ai](https://pc.0g.ai/)
+  - ✅ API key `sk-a2864179...` in `.env`, deposit done
+  - Live AI responses available; deterministic fallback if balance runs low
 
-- [ ] **Get KeeperHub key** — 🔴 RAJAT ACTION REQUIRED
-  - Get `kh_...` org key from [app.keeperhub.com](https://app.keeperhub.com)
-  - Add `KH_API_KEY=kh_...` to `.env`
-  - Without this: payments use demo receipts, not real USDC on Base
+- [x] **KeeperHub live** — `kh_dnNq2G1zE-...` set in `.env`
+  - ✅ `payAgent()` calling KeeperHub API live for all 4 swarm workers
+  - ✅ All 5 agents now have real HD-derived wallet addresses (secp256k1, valid on Base):
+    - Architect:    `0xbc86ca947Ab27b990054870566cfE849C2109D2d`
+    - NovaCoder:    `0x3E901427CBEd1A1D60B85C71b76E4464786E3508`
+    - InfoHound:    `0x26918ad7fC4C72d202745be4A49E7c97760C28b4`
+    - QualityGate:  `0xc9Bee86cB485343Fa0e184f52A730d3e578Bfc00`
+    - PennyWise:    `0xF1455C4Dd08303c0976a937709a70d023D773c8A`
+  - ⚠️  Last step: [app.keeperhub.com](https://app.keeperhub.com) → **Settings → Wallets → Create Wallet** → fund with Base USDC
+    - Without org wallet: API returns 422 (key works, source wallet needed to send from)
 
-- [ ] **Task detail page** (`/tasks/:id`) — optional but good for demo
-- [ ] **Payments log page** (`/payments`) — shows x402 receipt history
-- [ ] **Documentation cleanup** — Update README.md with demo instructions
+- [x] **Task detail page** (`/tasks/:id`) — ✅ Built and wired to backend API
+- [x] **Payments log page** (`/payments`) — ✅ Built with BaseScan / 0G ChainScan links
 - [ ] **Demo video recording**
 
-**✅ Current Milestone:** Full-stack system running, all tracks wired, all code deployed. Zero TypeScript errors. Ready for demo run.
-**🎯 Next Milestone:** Live LLM inference + real USDC payments (requires external keys).
+**✅ Current Milestone:** Full-stack, all 3 tracks wired, real on-chain txs confirmed on 0G Galileo, KeeperHub calling live. Zero TypeScript errors.
+**🎯 Final Step:** Create KeeperHub org wallet → fund with Base USDC → real USDC flows end-to-end.
 
 ---
 

@@ -1,4 +1,13 @@
+import { Wallet } from 'ethers';
+import { config } from 'dotenv';
+import { resolve } from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 import type { Agent, AgentRole, BidDecision, PersonalityVector, Task } from './types.js';
+
+// Load .env so PRIVATE_KEY is available when createDefaultAgents() is called at init
+const __dirname = dirname(fileURLToPath(import.meta.url));
+config({ path: resolve(__dirname, '../../../../.env') });
 
 const ROLE_PROMPTS: Record<AgentRole, string> = {
   coordinator:
@@ -121,15 +130,29 @@ export function shouldBidOnTask(agent: Agent, task: Task): BidDecision {
 }
 
 export function createDefaultAgents(): Array<Omit<Agent, 'id' | 'createdAt'>> {
-  // Deterministic addresses derived from deployer key index — real 0x addresses,
-  // not zero addresses. These are the agent treasury wallets on 0G Testnet.
-  const AGENT_WALLETS: string[] = [
-    '0xbc86ca947Ab27b990054870566cfE849C2109D2d', // Architect  (deployer — coordinator)
-    '0x1234567890AbCdEf1234567890AbCdEf12345678', // NovaCoder  (dev wallet slot)
-    '0xAbCdEf1234567890AbCdEf1234567890AbCdEf12', // InfoHound  (research wallet slot)
-    '0x9876543210fEdCbA9876543210fEdCbA98765432', // QualityGate (critic wallet slot)
-    '0xDeAdBeEf1234567890DeAdBeEf1234567890DeAd', // PennyWise  (trader wallet slot)
-  ];
+  // Derive real Ethereum wallet addresses deterministically from the deployer private key.
+  // Each agent index gets a unique address via byte-rotation of the private key.
+  // These are real secp256k1 keypairs — valid on Base for USDC receipt.
+  function deriveAgentWallet(index: number): string {
+    const pk = process.env.PRIVATE_KEY;
+    if (!pk) return `0x${'0'.repeat(40)}`;
+    const raw = pk.replace('0x', '');
+    if (raw.length !== 64) return `0x${'0'.repeat(40)}`;
+    if (index === 0) return new Wallet(`0x${raw}`).address;
+
+    const pkBytes = Buffer.from(raw, 'hex');
+    const derived = Buffer.alloc(32);
+    for (let i = 0; i < 32; i++) {
+      derived[i] = (pkBytes[i] ^ (index * 37 + i * 7)) & 0xff;
+    }
+    // Clamp first byte to ensure valid secp256k1 private key (must be in [1, n-1])
+    derived[0] = Math.max(1, derived[0] & 0x7f);
+    return new Wallet('0x' + derived.toString('hex')).address;
+  }
+
+  const AGENT_WALLETS = [0, 1, 2, 3, 4].map(deriveAgentWallet);
+  console.log('[Agents] Derived wallet addresses:');
+  AGENT_WALLETS.forEach((addr, i) => console.log(`  [${i}] ${addr}`));
 
   const seeds: Array<{ name: string; role: AgentRole; personality: PersonalityVector }> = [
     { name: 'Architect',   role: 'coordinator', personality: DEFAULT_PERSONALITIES.coordinator },
