@@ -1,515 +1,184 @@
-# 💳 KEEPERHUB_X402.md — KeeperHub + x402 Payment Integration
+# 💳 KEEPERHUB_X402.md — KeeperHub + x402 Integration
 
 > **Source of truth:** [tracks-docs/KeepersHub-completedocs.md](./tracks-docs/KeepersHub-completedocs.md)
 
 > **Implementation Status:**
-> - ⬜ Agentic Wallet setup
-> - ⬜ x402 payment handler
-> - ⬜ KeeperHub API client
-> - ⬜ Direct Execution integration
-> - ⬜ Payment flow wiring
+> - ✅ KeeperHub API client (`src/payments/keeperhub.ts`)
+> - ✅ x402 payment handler (`src/payments/x402.ts`)
+> - ✅ Payment distribution (`src/payments/agent-payments.ts`)
+> - ⏳ Agentic Wallet setup — needs `kh_` key + `npx keeperhub-wallet add`
+> - ⏳ MCP Server integration — needs `kh_` key
 
 ---
 
-## Overview
+## What KeeperHub Is
 
-KeeperHub is a **Web3 automation platform** that provides:
-1. **x402 payments** — USDC micropayments on Base (chain 8453) via signed authorization
-2. **Agentic Wallets** — Turnkey-backed wallets for agents (no private keys on disk)
-3. **Direct Execution API** — Execute blockchain transactions without workflows
-4. **Workflow Automation** — Visual workflow builder with triggers + actions
-5. **MCP Server** — AI agents discover and call workflows at runtime
+KeeperHub is the **execution and reliability layer** for agents operating onchain.
 
-### How AgentVerse Uses KeeperHub
+> *"Agents are great at reasoning, but they hit a wall when they need to actually move value: failed transactions, gas spikes, MEV extraction, zero guarantees."*
 
-| Use Case | KeeperHub Feature | Details |
-|----------|-------------------|---------|
-| Agent-to-agent payments | **x402 + Agentic Wallet** | Coordinator pays workers in USDC on Base |
-| Contract interactions | **Direct Execution API** | Agents call 0G contracts via KeeperHub infra |
-| Automated monitoring | **Workflows** | Monitor agent health, balance alerts |
-| Agent tool discovery | **MCP Server** | Agents discover available tools at runtime |
+It provides: guaranteed onchain execution, retry logic, gas optimization, private routing, full audit trails.
 
 ---
 
-## x402 Protocol — How Agent Payments Work
-
-x402 settles on **Base USDC** (chain 8453). The flow:
+## ⚠️ Chain Architecture — Critical Distinction
 
 ```
-Agent A wants to pay Agent B for completed work
+AgentVerse has TWO separate chains:
+
+0G Chain (16602)                    Base (8453)
+─────────────────                   ──────────────
+Agent identity (AgentNFT)           USDC payments
+Task lifecycle (TaskManager)        via KeeperHub x402
+Auction (Auction.sol)
+↑                                   ↑
+ethers.js directly                  KeeperHub API
+src/contracts/index.ts              src/payments/keeperhub.ts
+```
+
+**KeeperHub does NOT support 0G Chain.** It is used ONLY for:
+1. USDC payment settlement on Base between agents
+2. MCP workflow discovery at runtime
+3. Execution reliability / audit trail for Base transactions
+
+All 0G Chain interactions go through `src/contracts/index.ts` (ethers.js directly).
+
+---
+
+## How It Fits AgentVerse
+
+The core problem KeeperHub solves:
+
+| AgentVerse Scenario | Without KeeperHub | With KeeperHub |
+|---|---|---|
+| Coordinator pays 3 workers | Needs ETH for gas, tx might fail | USDC only, retry logic, guaranteed |
+| Payment gets MEV-extracted | No protection | Private routing |
+| Auditing who got paid what | Self-managed logs | Full audit trail |
+| Agent calls paid service (x402) | Manual payment handling | Automatic 402 challenge resolution |
+
+---
+
+## x402 Protocol — Agent Payment Flow
+
+x402 settles on **Base USDC** (chain 8453).
+
+```
+Task completes on 0G Chain (TaskManager records result)
     │
     ▼
-Agent A calls Agent B's paid endpoint
+Coordinator calls POST /execute/transfer via KeeperHub
     │
     ▼
-Agent B returns HTTP 402 with payment challenge
+KeeperHub agentic wallet signs EIP-3009 TransferWithAuthorization
     │
     ▼
-Agent A's agentic wallet signs EIP-3009 TransferWithAuthorization
+Facilitator submits on-chain to Base — pays gas on behalf of agent
     │
     ▼
-x402 facilitator submits on-chain, pays gas
+Worker wallets receive USDC on Base
     │
     ▼
-Agent B receives USDC, returns result
+KeeperHub returns executionId + audit trail
 ```
 
 **Key facts:**
-- Payments are in **USDC on Base** (address: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`)
-- Agent pays ONLY the USDC amount — **no ETH/gas needed** from the agent
-- The facilitator submits the tx and pays gas
-- Most workflows cost **under $0.05 per call**
-- Daily wallet cap: **200 USDC per UTC day** (server-enforced)
+- Agents pay **USDC only** — no ETH/gas needed
+- Facilitator covers gas
 - Per-transfer cap: **100 USDC** (Turnkey-enforced)
+- Daily cap: **200 USDC** (server-enforced)
+- Auto-approve: ≤$5 | Ask: ≤$100 | Block: >$100
 
 ---
 
 ## Agentic Wallet Setup
 
-### Option 1: KeeperHub Agentic Wallet (Recommended)
-
-Server-side Turnkey custody. No private key on disk. Three-tier safety hook.
-
 ```bash
-# Install skill + safety hook
+# Install wallet skill
 npx -p @keeperhub/wallet keeperhub-wallet skill install
 
-# Provision a new wallet
+# Provision wallet (creates ~/.keeperhub/wallet.json)
 npx -p @keeperhub/wallet keeperhub-wallet add
 ```
 
-This creates:
-- `~/.keeperhub/wallet.json` — HMAC secret (NOT a private key)
-- `~/.keeperhub/safety.json` — Payment thresholds
-
-**Default safety config:**
-```json
-{
-  "auto_approve_max_usd": 5,
-  "block_threshold_usd": 100,
-  "allowlisted_contracts": [
-    "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-    "0x20C000000000000000000000B9537D11c60E8b50"
-  ]
-}
-```
-
-| Tier | Behavior |
-|------|----------|
-| **auto** | ≤ $5 — signs without prompting |
-| **ask** | $5–$100 — inline permission prompt |
-| **block** | > $100 — denied |
-
-### Option 2: agentcash (Testing Only)
-
-```bash
-npx agentcash add https://app.keeperhub.com
-```
-
-⚠️ **Plaintext key on disk.** Testing only. Do NOT custody real funds.
-
-### Option 3: Coinbase Agentic Wallet Skills
-
-```bash
-npx skills add coinbase/agentic-wallet-skills
-```
-
-Requires CDP account. Good if already on Coinbase ecosystem.
+`wallet.json` contains only an HMAC secret — **not a private key**. Signing is server-side via Turnkey.
 
 ---
 
 ## KeeperHub API
 
-### Base URL & Auth
-
 ```
-Base: https://app.keeperhub.com/api
-Auth: Authorization: Bearer kh_your_api_key
+Base URL: https://app.keeperhub.com/api
+Auth:     Authorization: Bearer kh_your_org_key
+Rate:     60 req/min (direct exec), 100 req/min (API)
 ```
 
-Get API key: [app.keeperhub.com](https://app.keeperhub.com/) → Settings → API Keys → Organisation tab
+### Endpoints Used by AgentVerse
 
-### Key Endpoints for AgentVerse
-
-#### Direct Execution — Transfer Funds
 ```bash
+# Pay a worker agent (Base USDC)
 POST /api/execute/transfer
 {
   "network": "base",
   "recipientAddress": "0x...",
-  "amount": "0.05",
+  "amount": "2.50",
   "tokenAddress": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 }
-```
 
-#### Direct Execution — Call Smart Contract
-```bash
-POST /api/execute/contract-call
-{
-  "contractAddress": "0x...",
-  "network": "ethereum",
-  "functionName": "getAgent",
-  "functionArgs": "[\"1\"]",
-  "abi": "[{...}]"
-}
-```
+# Check payment status
+GET /api/execute/{executionId}/status
 
-#### Workflow Execution
-```bash
-# List workflows
+# List available workflows (MCP discovery)
 GET /api/workflows
 
 # Execute a workflow
 POST /api/workflow/{workflowId}/execute
-→ Returns { executionId, runId, status }
 
-# Check status
-GET /api/workflows/executions/{executionId}/status
-→ Returns { status, progress { percentage, currentNodeId } }
+# Check spending
+GET /api/analytics/spend-cap
 ```
-
-### Rate Limits
-- **API:** 100 req/min (authenticated)
-- **Direct Execution:** 60 req/min per API key
-- **x402 wallet:** 200 USDC/day aggregate
 
 ---
 
-## MCP Server Integration
+## MCP Integration
 
-Agents can discover and call KeeperHub workflows through the MCP (Model Context Protocol) server.
+Agents discover available KeeperHub workflows at runtime via MCP:
 
-### Setup
 ```bash
-# Remote (recommended — no local install)
-claude mcp add --transport http keeperhub https://app.keeperhub.com/mcp
-```
-
-Or headless with API key:
-```bash
+# Add to Claude / agent runtime
 claude mcp add --transport http keeperhub https://app.keeperhub.com/mcp \
-  --header "Authorization: Bearer kh_your_key_here"
+  --header "Authorization: Bearer kh_your_key"
 ```
 
-### Meta-Tools (Agent Runtime)
-
-The agent uses two meta-tools to discover and call workflows:
-
-| Tool | Description |
-|------|-------------|
-| `search_workflows` | Find workflows by category, tag, or free text. Returns slug, description, inputSchema, price |
-| `call_workflow` | Execute a workflow by slug. Read workflows return result; write workflows return unsigned calldata |
-
-This keeps the agent's tool list small — it discovers available workflows at runtime instead of hardcoding them.
+Agents use two meta-tools:
+- `search_workflows` — find workflows by tag/category
+- `call_workflow` — execute a discovered workflow
 
 ---
 
-## TypeScript Implementation
+## Implementation Files
 
-### KeeperHub API Client
-
-```typescript
-// packages/backend/src/payments/keeperhub.ts
-
-export class KeeperHubClient {
-  private baseUrl = 'https://app.keeperhub.com/api';
-  private apiKey: string;
-
-  constructor() {
-    this.apiKey = process.env.KH_API_KEY || '';
-  }
-
-  private async request(path: string, options: RequestInit = {}) {
-    const res = await fetch(`${this.baseUrl}${path}`, {
-      ...options,
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(`KeeperHub ${res.status}: ${err.error?.message || res.statusText}`);
-    }
-
-    return res.json();
-  }
-
-  // ── Direct Execution ──────────────────────────────
-
-  /** Transfer USDC on Base to an agent's wallet */
-  async transferUSDC(recipientAddress: string, amount: string) {
-    return this.request('/execute/transfer', {
-      method: 'POST',
-      body: JSON.stringify({
-        network: 'base',
-        recipientAddress,
-        amount,
-        tokenAddress: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // Base USDC
-      }),
-    });
-  }
-
-  /** Call a smart contract function */
-  async callContract(params: {
-    contractAddress: string;
-    network: string;
-    functionName: string;
-    functionArgs?: string;
-    abi?: string;
-    value?: string;
-  }) {
-    return this.request('/execute/contract-call', {
-      method: 'POST',
-      body: JSON.stringify(params),
-    });
-  }
-
-  /** Check-and-execute: read a value, evaluate condition, optionally execute */
-  async checkAndExecute(params: {
-    contractAddress: string;
-    network: string;
-    functionName: string;
-    functionArgs?: string;
-    condition: { operator: string; value: string };
-    action: {
-      contractAddress: string;
-      functionName: string;
-      functionArgs?: string;
-      abi?: string;
-    };
-  }) {
-    return this.request('/execute/check-and-execute', {
-      method: 'POST',
-      body: JSON.stringify(params),
-    });
-  }
-
-  // ── Execution Status ──────────────────────────────
-
-  async getExecutionStatus(executionId: string) {
-    return this.request(`/execute/${executionId}/status`);
-  }
-
-  // ── Workflows ─────────────────────────────────────
-
-  async listWorkflows() {
-    return this.request('/workflows');
-  }
-
-  async executeWorkflow(workflowId: string) {
-    return this.request(`/workflow/${workflowId}/execute`, { method: 'POST' });
-  }
-
-  async getWorkflowExecutionStatus(executionId: string) {
-    return this.request(`/workflows/executions/${executionId}/status`);
-  }
-
-  // ── Analytics ─────────────────────────────────────
-
-  async getSpendCap() {
-    return this.request('/analytics/spend-cap');
-  }
-}
-```
-
-### x402 Payment Handler
-
-```typescript
-// packages/backend/src/payments/x402.ts
-
-/**
- * Handle x402 payment challenges from paid endpoints.
- * When an agent calls a paid service and gets HTTP 402,
- * the agentic wallet intercepts, signs, and retries.
- *
- * For AgentVerse, the flow is:
- * 1. Agent A completes work for Agent B
- * 2. Agent B's coordinator calls payment endpoint
- * 3. KeeperHub wallet handles the 402 challenge transparently
- * 4. USDC transfers on Base
- */
-export async function handleX402Payment(
-  serviceUrl: string,
-  payload: any,
-  options: { maxRetries?: number } = {}
-): Promise<any> {
-  const maxRetries = options.maxRetries || 3;
-
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    const res = await fetch(serviceUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    if (res.status === 402) {
-      // The agentic wallet skill handles this automatically
-      // when running inside Claude Code / MCP-enabled agent
-      console.log('[x402] Payment required, wallet handling...');
-      continue;
-    }
-
-    if (res.ok) {
-      return res.json();
-    }
-
-    throw new Error(`Service error: ${res.status}`);
-  }
-
-  throw new Error('x402 payment failed after retries');
-}
-```
-
-### Agent Payment Wrapper
-
-```typescript
-// packages/backend/src/payments/agent-payments.ts
-
-import { KeeperHubClient } from './keeperhub.js';
-
-const kh = new KeeperHubClient();
-
-/**
- * Distribute task payment from coordinator to workers
- * Uses KeeperHub Direct Execution for USDC transfers on Base
- */
-export async function distributeTaskPayment(
-  taskId: string,
-  workers: Array<{
-    agentId: number;
-    walletAddress: string;
-    sharePercent: number;
-  }>,
-  totalBudgetUSDC: number
-) {
-  const results = [];
-
-  for (const worker of workers) {
-    const amount = ((totalBudgetUSDC * worker.sharePercent) / 100).toFixed(6);
-
-    try {
-      const result = await kh.transferUSDC(worker.walletAddress, amount);
-      results.push({
-        agentId: worker.agentId,
-        amount,
-        status: 'success',
-        executionId: result.executionId,
-      });
-      console.log(`[Payment] Agent ${worker.agentId}: $${amount} USDC → ${worker.walletAddress}`);
-    } catch (err) {
-      results.push({
-        agentId: worker.agentId,
-        amount,
-        status: 'failed',
-        error: (err as Error).message,
-      });
-      console.error(`[Payment] Agent ${worker.agentId} payment failed:`, err);
-    }
-  }
-
-  return results;
-}
-```
+| File | Purpose |
+|------|---------|
+| `src/payments/keeperhub.ts` | API client — Base USDC transfers + MCP workflows |
+| `src/payments/x402.ts` | x402 402-challenge handler with retry + safety thresholds |
+| `src/payments/agent-payments.ts` | Distribution strategies (equal / reputation-weighted) |
 
 ---
 
-## Payment Flows in AgentVerse
-
-### Flow 1: Task Completion Payment
-
-```
-User creates task with USDC budget
-    │
-    ▼
-Coordinator decomposes task, assigns to workers
-    │
-    ▼
-Workers complete subtasks
-    │
-    ▼
-Coordinator verifies results
-    │
-    ▼
-KeeperHub Direct Execution: USDC transfers to worker wallets
-    │
-    ▼
-On-chain TaskManager records completion
-```
-
-### Flow 2: Agent Paying for External Services
-
-```
-Agent needs external data/compute
-    │
-    ▼
-Agent calls paid service endpoint
-    │
-    ▼
-Service returns HTTP 402 (payment required)
-    │
-    ▼
-Agentic wallet signs EIP-3009 authorization
-    │
-    ▼
-x402 facilitator settles USDC on Base
-    │
-    ▼
-Service returns result
-```
-
----
-
-## Environment Variables
+## Environment
 
 ```env
-# KeeperHub
 KH_API_KEY=kh_your_organization_api_key
-
-# Agentic Wallet (created by npx keeperhub-wallet add)
-# Stored at ~/.keeperhub/wallet.json — do NOT commit
-# Safety config at ~/.keeperhub/safety.json
+# Get from: app.keeperhub.com → Settings → API Keys → Organisation
 ```
 
 ---
 
-## Key Constraints
-
-| Constraint | Value | Source |
-|-----------|-------|--------|
-| Payment chain | Base (8453) only | Turnkey server-side policy |
-| Payment token | USDC only | Contract allowlist |
-| Max per transfer | 100 USDC | Turnkey policy |
-| Max per day | 200 USDC | Server-enforced |
-| Max auto-approve | $5 (configurable) | Client safety hook |
-| API rate limit | 60 req/min (direct exec) | KeeperHub API |
-| Wallet recovery | NOT possible if wallet.json lost | Back up the file |
-
----
-
-## CLI Reference (Quick)
+## CLI Reference
 
 ```bash
-# Install
 brew install keeperhub/tap/kh
-
-# Auth
 kh auth login
-
-# List workflows
 kh workflow list
-
-# Run workflow and wait
 kh workflow run <workflow-id> --wait
-
-# Check run status
-kh run status <run-id>
-
-# Execute contract call
-kh execute contract-call --protocol aave --action supply --args '{"amount":"1000000"}'
-
-# List protocols
-kh protocol list
 ```

@@ -1,15 +1,28 @@
 /**
  * KeeperHub API Client
- * Direct Execution + Workflow management
+ * PAYMENT LAYER ONLY — Base USDC transfers + MCP workflow discovery
  * 📖 Ref: docs/KEEPERHUB_X402.md, docs/tracks-docs/KeepersHub-completedocs.md
  *
+ * ⚠️  IMPORTANT ARCHITECTURE NOTE:
+ *     KeeperHub DOES NOT support 0G Chain (16602).
+ *     KeeperHub is used ONLY for:
+ *       1. x402 USDC payments on Base (chain 8453) between agents
+ *       2. MCP workflow discovery at runtime
+ *       3. Execution reliability / audit trail for Base transactions
+ *
+ *     All 0G Chain interactions (AgentNFT, TaskManager, Auction)
+ *     go through our own ethers.js client → src/contracts/index.ts
+ *
  * Base URL: https://app.keeperhub.com/api
- * Auth: Bearer kh_... (org-scoped API key)
- * Rate: 60 req/min (direct exec), 100 req/min (API)
+ * Auth:     Bearer kh_... (org-scoped API key)
+ * Rate:     60 req/min (direct exec), 100 req/min (API)
  */
 
 const BASE_URL = "https://app.keeperhub.com/api";
-const BASE_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // Base chain USDC
+
+// Base chain USDC — the only token KeeperHub handles for AgentVerse payments
+export const BASE_USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+export const BASE_CHAIN_ID = 8453;
 
 export class KeeperHubClient {
   private apiKey: string;
@@ -51,101 +64,42 @@ export class KeeperHubClient {
   }
 
   // ══════════════════════════════════════════════
-  // Direct Execution — Transfer Funds
+  // Agent Payments — USDC on Base (chain 8453)
   // ══════════════════════════════════════════════
 
   /**
-   * Transfer USDC on Base to a recipient
-   * Agent pays USDC only — NO gas needed (facilitator pays)
-   * Per-transfer cap: 100 USDC, daily cap: 200 USDC
+   * Transfer USDC on Base to a worker agent's wallet.
+   *
+   * This is the ONLY on-chain action KeeperHub performs for AgentVerse.
+   * Agent pays USDC only — KeeperHub handles gas (facilitator model).
+   *
+   * Limits:
+   *  - Per-transfer cap: 100 USDC (Turnkey-enforced)
+   *  - Daily cap:        200 USDC (server-enforced)
+   *  - Safety auto-approve: ≤$5, ask: ≤$100, block: >$100
    */
-  async transferUSDC(
-    recipientAddress: string,
-    amount: string
+  async payAgent(
+    workerWalletAddress: string,
+    amountUSDC: string
   ): Promise<DirectExecutionResult> {
-    console.log(`[KeeperHub] Transferring $${amount} USDC → ${recipientAddress}`);
+    console.log(
+      `[KeeperHub] Paying agent $${amountUSDC} USDC → ${workerWalletAddress}`
+    );
     return this.request("/execute/transfer", {
       method: "POST",
       body: JSON.stringify({
         network: "base",
-        recipientAddress,
-        amount,
-        tokenAddress: BASE_USDC,
+        recipientAddress: workerWalletAddress,
+        amount: amountUSDC,
+        tokenAddress: BASE_USDC_ADDRESS,
       }),
     });
   }
 
   /**
-   * Transfer native tokens (ETH, A0GI, etc.)
+   * Poll execution until completed or failed
    */
-  async transferNative(
-    network: string,
-    recipientAddress: string,
-    amount: string
-  ): Promise<DirectExecutionResult> {
-    return this.request("/execute/transfer", {
-      method: "POST",
-      body: JSON.stringify({ network, recipientAddress, amount }),
-    });
-  }
-
-  // ══════════════════════════════════════════════
-  // Direct Execution — Smart Contract Calls
-  // ══════════════════════════════════════════════
-
-  /**
-   * Call any smart contract function
-   * Auto-detects read vs write operations
-   */
-  async callContract(params: {
-    contractAddress: string;
-    network: string;
-    functionName: string;
-    functionArgs?: string;
-    abi?: string;
-    value?: string;
-    gasLimitMultiplier?: string;
-  }): Promise<any> {
-    return this.request("/execute/contract-call", {
-      method: "POST",
-      body: JSON.stringify(params),
-    });
-  }
-
-  /**
-   * Check-and-execute: read a value, evaluate condition, optionally execute
-   */
-  async checkAndExecute(params: {
-    contractAddress: string;
-    network: string;
-    functionName: string;
-    functionArgs?: string;
-    condition: { operator: "eq" | "neq" | "gt" | "lt" | "gte" | "lte"; value: string };
-    action: {
-      contractAddress: string;
-      functionName: string;
-      functionArgs?: string;
-      abi?: string;
-    };
-  }): Promise<CheckAndExecuteResult> {
-    return this.request("/execute/check-and-execute", {
-      method: "POST",
-      body: JSON.stringify(params),
-    });
-  }
-
-  // ══════════════════════════════════════════════
-  // Execution Status
-  // ══════════════════════════════════════════════
-
-  async getExecutionStatus(executionId: string): Promise<ExecutionStatus> {
-    return this.request(`/execute/${executionId}/status`);
-  }
-
-  /**
-   * Poll execution until completion
-   */
-  async waitForExecution(
+  async waitForPayment(
     executionId: string,
     timeoutMs = 60000,
     pollMs = 2000
@@ -158,59 +112,51 @@ export class KeeperHubClient {
       }
       await new Promise((r) => setTimeout(r, pollMs));
     }
-    throw new KeeperHubError("Execution timed out", 408, "TIMEOUT");
+    throw new KeeperHubError("Payment timed out", 408, "TIMEOUT");
+  }
+
+  async getExecutionStatus(executionId: string): Promise<ExecutionStatus> {
+    return this.request(`/execute/${executionId}/status`);
   }
 
   // ══════════════════════════════════════════════
-  // Workflows
+  // MCP — Workflow Discovery at Runtime
   // ══════════════════════════════════════════════
 
+  /**
+   * List workflows available to this org.
+   * Agents use this to discover automatable actions at runtime.
+   */
   async listWorkflows(): Promise<any[]> {
     return this.request("/workflows");
   }
 
-  async getWorkflow(workflowId: string): Promise<any> {
-    return this.request(`/workflows/${workflowId}`);
-  }
-
+  /**
+   * Execute a KeeperHub workflow by ID.
+   * Used by agents to trigger automations (e.g. monitoring, notifications).
+   */
   async executeWorkflow(workflowId: string): Promise<WorkflowExecution> {
     return this.request(`/workflow/${workflowId}/execute`, { method: "POST" });
   }
 
-  async getWorkflowExecutionStatus(
-    executionId: string
-  ): Promise<WorkflowExecutionStatus> {
+  async getWorkflowStatus(executionId: string): Promise<WorkflowExecutionStatus> {
     return this.request(`/workflows/executions/${executionId}/status`);
   }
 
-  async getWorkflowExecutionLogs(executionId: string): Promise<any> {
+  async getWorkflowLogs(executionId: string): Promise<any> {
     return this.request(`/workflows/executions/${executionId}/logs`);
   }
 
   // ══════════════════════════════════════════════
-  // Analytics
+  // Spend / Analytics
   // ══════════════════════════════════════════════
 
   async getSpendCap(): Promise<SpendCap> {
     return this.request("/analytics/spend-cap");
   }
 
-  async getAnalyticsSummary(range = "30d"): Promise<any> {
+  async getAnalyticsSummary(range = "7d"): Promise<any> {
     return this.request(`/analytics/summary?range=${range}`);
-  }
-
-  // ══════════════════════════════════════════════
-  // Integrations
-  // ══════════════════════════════════════════════
-
-  async listIntegrations(type?: string): Promise<any[]> {
-    const query = type ? `?type=${type}` : "";
-    return this.request(`/integrations${query}`);
-  }
-
-  async getWalletIntegration(): Promise<any> {
-    const integrations = await this.listIntegrations("web3");
-    return integrations[0]; // First web3 integration
   }
 }
 
@@ -226,26 +172,12 @@ export interface DirectExecutionResult {
 export interface ExecutionStatus {
   executionId: string;
   status: "pending" | "running" | "completed" | "failed";
-  type?: string;
   transactionHash?: string;
   transactionLink?: string;
   gasUsedWei?: string;
-  result?: any;
   error?: string | null;
   createdAt?: string;
   completedAt?: string;
-}
-
-export interface CheckAndExecuteResult {
-  executed: boolean;
-  executionId?: string;
-  status?: string;
-  condition: {
-    met: boolean;
-    observedValue: string;
-    targetValue: string;
-    operator: string;
-  };
 }
 
 export interface WorkflowExecution {
@@ -256,12 +188,9 @@ export interface WorkflowExecution {
 
 export interface WorkflowExecutionStatus {
   status: "pending" | "running" | "success" | "error" | "cancelled";
-  nodeStatuses?: Array<{ nodeId: string; status: string }>;
   progress?: {
     totalSteps: number;
     completedSteps: number;
-    runningSteps: number;
-    currentNodeId: string;
     percentage: number;
   };
 }
@@ -287,8 +216,6 @@ export class KeeperHubError extends Error {
 // ── Singleton ───────────────────────────────────
 let _client: KeeperHubClient;
 export function getKeeperHub(): KeeperHubClient {
-  if (!_client) {
-    _client = new KeeperHubClient();
-  }
+  if (!_client) _client = new KeeperHubClient();
   return _client;
 }

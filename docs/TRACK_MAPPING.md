@@ -100,36 +100,45 @@ AgentVerse integrates **all three hackathon tracks** deeply — not as add-ons, 
 
 ## Track 3: KeeperHub + x402 (Payments + Automation)
 
+### Chain Separation — Critical Architecture Note
+
+```
+0G Chain (16602)     ← agent identity, tasks, auctions (ethers.js)
+Base Chain (8453)    ← USDC payments via KeeperHub x402
+```
+
+KeeperHub **does NOT support 0G Chain**. It is the payment and reliability layer for Base USDC only.
+
 ### How AgentVerse Uses KeeperHub + x402
 
 | Feature | AgentVerse Usage | Depth |
 |---------|-----------------|-------|
-| **x402 Protocol** | Agent-to-agent micropayments (Base USDC) | Core |
-| **Agentic Wallet** | Turnkey-backed wallets for agents (no keys on disk) | Core |
-| **Direct Execution API** | Contract calls + transfers from agents | Core |
-| **MCP Server** | Agents discover workflows at runtime | Extended |
-| **Workflow Automation** | Agent monitoring, scheduled tasks | Extended |
+| **x402 Protocol** | Agent-to-agent micropayments in USDC on Base | Core |
+| **Agentic Wallet** | Turnkey-backed wallets — agents pay USDC, no gas needed | Core |
+| **Direct Execution `/execute/transfer`** | Coordinator pays workers after task completes | Core |
+| **MCP Server** | Agents discover available workflows at runtime | Extended |
+| **Audit Trail** | Every payment logged with executionId + tx hash | Extended |
 
 ### Specific Implementations
 
-1. **x402 Payments**
-   - Agents pay each other in USDC on Base (chain 8453)
-   - EIP-3009 TransferWithAuthorization — agent pays NO gas
+1. **x402 Payments (Base USDC)**
+   - Tasks priced in USDC, settled on Base (chain 8453) via KeeperHub
+   - EIP-3009 TransferWithAuthorization — agents pay NO gas
    - Facilitator submits on-chain, handles gas
-   - Most payments under $0.05 per call
-   - Source: to implement as `src/payments/x402.ts`
+   - Per-transfer cap: 100 USDC | Daily cap: 200 USDC
+   - Source: `src/payments/x402.ts` ✅ Built
 
 2. **Agentic Wallets**
-   - KeeperHub agentic wallet via `@keeperhub/wallet`
-   - Turnkey-backed — no private key on disk
-   - Three-tier safety: auto ($5) / ask ($100) / block
-   - Per-transfer cap: 100 USDC, daily cap: 200 USDC
+   - KeeperHub wallet via `@keeperhub/wallet` (Turnkey-backed)
+   - No private key on disk — HMAC secret only
+   - Safety: auto ≤$5 | ask ≤$100 | block >$100
+   - Source: setup docs in `KEEPERHUB_X402.md` ⏳ Needs `kh_` key
 
-3. **Direct Execution**
-   - `POST /api/execute/transfer` — USDC transfers
-   - `POST /api/execute/contract-call` — smart contract interactions
-   - `POST /api/execute/check-and-execute` — conditional execution
-   - Rate limit: 60 req/min per API key
+3. **Payment Distribution**
+   - Coordinator calls `payAgent()` → KeeperHub `POST /execute/transfer`
+   - Strategies: equal share or reputation-weighted
+   - Retries + audit trail from KeeperHub
+   - Source: `src/payments/agent-payments.ts` ✅ Built | `src/payments/keeperhub.ts` ✅ Built
 
 4. **MCP Integration**
    - Agents use `search_workflows` + `call_workflow` meta-tools
