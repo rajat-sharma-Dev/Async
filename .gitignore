@@ -1,0 +1,27 @@
+node_modules/
+dist/
+build/
+.env
+.env.local
+*.pem
+
+# Hardhat
+cache/
+artifacts/
+typechain-types/
+
+# AXL
+packages/axl-nodes/node
+packages/axl-nodes/private*.pem
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Coverage
+coverage/
+coverage.json

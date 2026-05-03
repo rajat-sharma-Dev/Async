@@ -1,0 +1,23 @@
+{
+  "name": "agentverse",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Decentralized autonomous world of AI agents",
+  "workspaces": [
+    "packages/contracts",
+    "packages/backend",
+    "packages/frontend"
+  ],
+  "scripts": {
+    "contracts:compile": "npm run compile --workspace=packages/contracts",
+    "contracts:deploy": "npm run deploy:testnet --workspace=packages/contracts",
+    "contracts:test": "npm run test --workspace=packages/contracts",
+    "backend:dev": "npm run dev --workspace=packages/backend",
+    "frontend:dev": "npm run dev --workspace=packages/frontend"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rajat-sharma-Dev/Async.git"
+  },
+  "license": "MIT"
+}
