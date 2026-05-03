@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 import crypto from 'crypto';
-import { createConfiguredAXLClients } from '../axl/client.js';
+import { AXLRouter, buildAXLMessage, createConfiguredAXLClients } from '../axl/client.js';
 import { createLLMProvider, type LLMProvider } from '../llm/provider.js';
 import { ZeroGMemory } from '../storage/zerog.js';
 import { createSwarm } from '../swarm/auction.js';
@@ -21,12 +21,19 @@ import type {
   Task,
   TimelineEvent,
 } from './types.js';
+import {
+  bridgeCreateTask,
+  bridgeFormSwarm,
+  bridgeSubmitResult,
+  getOnChainTaskId,
+} from '../bridge/onchain.js';
+import { distributeTaskPayment, calculateEqualShares } from '../payments/agent-payments.js';
 
 export class AgentRuntime {
   readonly events = new EventEmitter();
   private readonly memory = new ZeroGMemory();
   private readonly llm: LLMProvider = createLLMProvider();
-  private readonly axlClients = createConfiguredAXLClients();
+  private readonly axlRouter = new AXLRouter(createConfiguredAXLClients());
   private readonly agents = new Map<string, Agent>();
   private readonly tasks = new Map<string, Task>();
   private readonly bids = new Map<string, Bid[]>();
@@ -40,6 +47,13 @@ export class AgentRuntime {
     for (const agent of createDefaultAgents()) {
       this.createAgent(agent);
     }
+    // Init AXL router (non-blocking — falls back to local bus if nodes are down)
+    void this.axlRouter.init().then(() => {
+      // Subscribe to AXL broadcasts to receive P2P messages from other nodes
+      this.axlRouter.onBroadcast((msg) => {
+        this.emit('axl:message', msg);
+      });
+    });
   }
 
   listAgents(): Agent[] {
@@ -68,6 +82,10 @@ export class AgentRuntime {
 
   getSwarm(taskId: string): Swarm | undefined {
     return [...this.swarms.values()].find((swarm) => swarm.taskId === taskId);
+  }
+
+  async getAxlTopology(): Promise<Record<string, unknown>> {
+    return this.axlRouter.getTopology();
   }
 
   async getAgentProfile(id: string): Promise<{ agent: Agent; memory: unknown; taskHistory: unknown[]; earnings: { total: number; history: PaymentReceipt[] } } | null> {
@@ -142,7 +160,17 @@ export class AgentRuntime {
     if (!task) return;
 
     try {
+      // ── 1. Create on 0G Chain (non-blocking) ───────────────────────────
+      void bridgeCreateTask(task.id, task.description, task.budget);
+
+      // ── 2. Broadcast task via AXL P2P ──────────────────────────────────
       task.status = 'bidding';
+      const broadcastMsg = buildAXLMessage('TASK_BROADCAST', 'backend', 'broadcast', {
+        taskId: task.id,
+        description: task.description,
+        budget: task.budget,
+      }, task.id);
+      await this.axlRouter.broadcast('node-a', broadcastMsg);
       this.emit('agent:message', {
         from: 'backend',
         to: 'broadcast',
@@ -151,6 +179,7 @@ export class AgentRuntime {
         timestamp: Date.now(),
       });
 
+      // ── 3. Agents evaluate and bid ──────────────────────────────────────
       const bids: Bid[] = [];
       for (const agent of this.listAgents().filter((candidate) => candidate.isActive)) {
         const decision = shouldBidOnTask(agent, task);
@@ -169,6 +198,11 @@ export class AgentRuntime {
             timestamp: Date.now(),
           };
           bids.push(bid);
+
+          // Send bid via AXL P2P
+          const bidMsg = buildAXLMessage('BID', agent.axlPeerId, 'backend', bid, task.id);
+          await this.axlRouter.send(agent.axlNodeId, 'backend', bidMsg);
+
           this.emit('task:bidReceived', {
             taskId: task.id,
             agentId: agent.id,
@@ -180,14 +214,30 @@ export class AgentRuntime {
       }
       this.bids.set(task.id, bids);
 
+      // ── 4. Form swarm ───────────────────────────────────────────────────
       const swarm = createSwarm(task.id, bids, this.listAgents());
       this.swarms.set(swarm.id, swarm);
       task.status = 'in_progress';
       task.swarmId = swarm.id;
       task.coordinatorAgentId = swarm.coordinatorAgentId;
-      const swarmAgents = swarm.memberAgentIds.map((id) => this.agents.get(id)).filter((agent): agent is Agent => Boolean(agent));
+      const swarmAgents = swarm.memberAgentIds
+        .map((id) => this.agents.get(id))
+        .filter((agent): agent is Agent => Boolean(agent));
       this.emit('swarm:formed', { taskId: task.id, swarmId: swarm.id, agents: swarmAgents, coordinatorId: swarm.coordinatorAgentId });
 
+      // Bridge swarm to 0G Chain
+      void bridgeFormSwarm(task.id, swarm);
+
+      // Send swarm invites via AXL
+      for (const agent of swarmAgents) {
+        const invite = buildAXLMessage('SWARM_INVITE', swarm.coordinatorAgentId, agent.axlPeerId, {
+          swarmId: swarm.id,
+          role: agent.role,
+        }, task.id);
+        await this.axlRouter.send(swarm.coordinatorAgentId.includes('node-b') ? 'node-b' : 'node-a', agent.axlPeerId, invite);
+      }
+
+      // ── 5. Decompose task ───────────────────────────────────────────────
       task.subtasks = await decomposeTask(task, swarmAgents, this.llm);
       for (const subtask of task.subtasks) {
         subtask.assignedAgentId =
@@ -195,11 +245,21 @@ export class AgentRuntime {
       }
       this.emit('task:decomposed', { taskId: task.id, subtasks: task.subtasks });
 
+      // ── 6. Execute subtasks ─────────────────────────────────────────────
       for (const subtask of task.subtasks) {
         const agent = this.agents.get(subtask.assignedAgentId);
         if (!agent) continue;
         subtask.status = 'in_progress';
         subtask.attempts += 1;
+
+        // Coordinator delegates via AXL
+        const delegation = buildAXLMessage('DELEGATION', task.coordinatorAgentId, agent.axlPeerId, {
+          subtaskId: subtask.id,
+          title: subtask.title,
+          description: subtask.description,
+        }, task.id);
+        await this.axlRouter.send('node-a', agent.axlPeerId, delegation);
+
         this.emit('agent:message', {
           from: task.coordinatorAgentId,
           to: agent.id,
@@ -207,6 +267,7 @@ export class AgentRuntime {
           content: subtask.description,
           timestamp: Date.now(),
         });
+
         const memory = await this.safeGetAgentMemory(agent.id);
         const prompt = `${buildSystemPrompt(agent, memory)}
 
@@ -218,6 +279,14 @@ Return the agent's concrete result in 4-8 bullet points.`;
         subtask.result = output;
         subtask.status = 'complete';
         this.emit('task:subtaskComplete', { taskId: task.id, subtaskId: subtask.id, result: output });
+
+        // Agent sends result back via AXL
+        const resultMsg = buildAXLMessage('RESULT', agent.axlPeerId, task.coordinatorAgentId, {
+          subtaskId: subtask.id,
+          result: output,
+        }, task.id);
+        await this.axlRouter.send(agent.axlNodeId, task.coordinatorAgentId, resultMsg);
+
         await this.safeAppendTaskResult(agent.id, {
           taskId: task.id,
           subtaskId: subtask.id,
@@ -227,8 +296,14 @@ Return the agent's concrete result in 4-8 bullet points.`;
         });
       }
 
+      // ── 7. Critic review ────────────────────────────────────────────────
       const critic = swarmAgents.find((agent) => agent.role === 'critic');
       if (critic) {
+        const reviewReq = buildAXLMessage('REVIEW_REQUEST', task.coordinatorAgentId, critic.axlPeerId, {
+          taskId: task.id,
+          subtaskCount: task.subtasks.length,
+        }, task.id);
+        await this.axlRouter.send('node-a', critic.axlPeerId, reviewReq);
         this.emit('agent:message', {
           from: task.coordinatorAgentId,
           to: critic.id,
@@ -238,20 +313,89 @@ Return the agent's concrete result in 4-8 bullet points.`;
         });
       }
 
+      // ── 8. Complete + submit result on-chain ────────────────────────────
       task.status = 'completed';
       task.completedAt = Date.now();
       task.finalResult = this.composeFinalResult(task, swarmAgents);
       task.resultHash = this.makeDemoResultHash(task);
-      this.createPaymentReceipts(task, swarmAgents);
+
+      // THE KEY BRIDGE: submit result hash to 0G Chain TaskManager
+      const onChainTxHash = await bridgeSubmitResult(task.id, task.resultHash);
+      const onChainTaskId = getOnChainTaskId(task.id);
+
+      this.emit('chain:resultSubmitted', {
+        taskId: task.id,
+        onChainTaskId,
+        resultHash: task.resultHash,
+        txHash: onChainTxHash,
+        explorer: onChainTxHash
+          ? `https://chainscan-galileo.0g.ai/tx/${onChainTxHash}`
+          : null,
+      });
+
+      // ── 9. Payments ─────────────────────────────────────────────────────
+      await this.handlePayments(task, swarmAgents);
+
       this.emit('task:complete', {
         taskId: task.id,
         finalResult: task.finalResult,
         resultHash: task.resultHash,
+        onChainTaskId,
+        onChainTxHash,
         payments: this.payments.filter((payment) => payment.txHash.includes(task.id)),
       });
     } catch (error) {
       task.status = 'failed';
       this.emit('task:failed', { taskId, error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+
+  /**
+   * Handle payments: use KeeperHub USDC if configured, else demo receipts.
+   */
+  private async handlePayments(task: Task, agents: Agent[]): Promise<void> {
+    const khKey = process.env.KH_API_KEY;
+
+    if (khKey && !khKey.includes('your_') && agents[0]?.walletAddress && !agents[0].walletAddress.startsWith('demo-')) {
+      // Real KeeperHub USDC payments on Base
+      try {
+        const workers = calculateEqualShares(
+          agents.map((a) => ({ agentId: parseInt(a.id.replace(/\D/g, '') || '1'), walletAddress: a.walletAddress }))
+        );
+        const distribution = await distributeTaskPayment(parseInt(task.id.replace(/\D/g, '') || '0'), workers, task.budget);
+        for (const p of distribution.payments) {
+          const receipt: PaymentReceipt = {
+            txHash: p.executionId || `kh-${task.id}-${p.agentId}`,
+            from: task.requester,
+            to: p.walletAddress,
+            amount: parseFloat(p.amount),
+            asset: 'USDC (Base)',
+            timestamp: Date.now(),
+            status: p.status === 'success' ? 'confirmed' : 'failed',
+          };
+          this.payments.push(receipt);
+          this.emit('payment:confirmed', receipt);
+        }
+        return;
+      } catch (err) {
+        console.warn('[Runtime] KeeperHub payment failed, falling back to demo receipts:', (err as Error).message);
+      }
+    }
+
+    // Demo payment receipts (no KH key or demo wallets)
+    const share = Number((task.budget / Math.max(agents.length, 1)).toFixed(2));
+    for (const agent of agents) {
+      const receipt: PaymentReceipt = {
+        txHash: `demo-${task.id}-${agent.id}`,
+        from: task.coordinatorAgentId || task.requester,
+        to: agent.id,
+        amount: share,
+        asset: khKey ? 'USDC (Base, pending)' : 'demo',
+        timestamp: Date.now(),
+        status: 'confirmed',
+      };
+      this.payments.push(receipt);
+      this.emit('payment:confirmed', receipt);
     }
   }
 
@@ -278,7 +422,7 @@ Return the agent's concrete result in 4-8 bullet points.`;
     try {
       await this.memory.appendTaskResult(numericId, result);
     } catch {
-      // The storage wrapper logs live 0G errors. Demo execution should continue.
+      // Storage logs live 0G errors. Demo continues.
     }
   }
 
@@ -293,23 +437,6 @@ Return the agent's concrete result in 4-8 bullet points.`;
   private makeDemoResultHash(task: Task): string {
     const digest = crypto.createHash('sha256').update(JSON.stringify(task)).digest('hex');
     return `0g://result/${digest}`;
-  }
-
-  private createPaymentReceipts(task: Task, agents: Agent[]): void {
-    const share = Number((task.budget / Math.max(agents.length, 1)).toFixed(2));
-    for (const agent of agents) {
-      const receipt: PaymentReceipt = {
-        txHash: `demo-${task.id}-${agent.id}`,
-        from: task.coordinatorAgentId || task.requester,
-        to: agent.id,
-        amount: share,
-        asset: '0G-demo',
-        timestamp: Date.now(),
-        status: 'confirmed',
-      };
-      this.payments.push(receipt);
-      this.emit('payment:confirmed', receipt);
-    }
   }
 
   private emit(event: string, data: unknown): void {

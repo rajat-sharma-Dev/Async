@@ -1,13 +1,13 @@
 # 📊 PROGRESS.md — Live Progress Log
 
-## Status: 🟢 Phase 2 — Rajat Tasks COMPLETE
+## Status: 🟢 Phase 2 COMPLETE — Full Swarm Runtime Running
 
 | Phase | Status | Rajat | Pranav |
 |-------|--------|-------|--------|
 | Docs & Planning | ✅ Complete | All docs written | — |
-| Phase 1: Foundation | ✅ Complete | All tasks done | ⬜ Not started |
-| Phase 2: Swarm + Economy | 🟡 In Progress | ✅ All Rajat tasks done | ⬜ Not started |
-| Phase 3: Frontend + Demo | ⬜ Not Started | — | — |
+| Phase 1: Foundation | ✅ Complete | Contracts deployed + backend | ✅ AXL nodes + configs |
+| Phase 2: Swarm + Economy | ✅ Complete | Bridge + Payments + KeeperHub | ✅ Runtime + Frontend + Decomposer |
+| Phase 3: Polish + Demo | 🟡 Next | Frontend UX | Integration polish |
 
 ---
 
@@ -107,6 +107,34 @@ Built and verified:
 Verified live:
 - `GET /api/health` → status ok, contracts, 10.48 A0GI balance ✅
 - TypeScript: zero errors (`tsc --noEmit`) ✅
+
+**18:16** — 🟢 **Pranav MVP pushed + Phase 2 fully bridged:**
+
+Pranav added (commit a5e6d5f):
+- `src/agents/runtime.ts` — Full swarm lifecycle engine
+- `src/agents/personality.ts` — Personality vectors + bidding logic
+- `src/swarm/auction.ts` — Coordinator election + swarm formation
+- `src/swarm/decomposer.ts` — LLM task decomposition (0G Compute + fallback)
+- `src/axl/client.ts` — AXL stub
+- `packages/frontend/` — React + Vite dashboard
+- `README.md` — Hackathon-ready readme
+
+Rajat bridged all gaps:
+- `src/bridge/onchain.ts` — Runtime → 0G Chain bridge
+  - `bridgeCreateTask()` → TaskManager.createTask()
+  - `bridgeFormSwarm()` → TaskManager.formSwarm()
+  - `bridgeSubmitResult()` → TaskManager.submitResult() → on-chain✅
+- `src/axl/client.ts` — Replaced stub with real AXLRouter
+  - Real HTTP to nodes (9002/9012), auto-detects reachability
+  - In-process EventEmitter fallback when offline
+  - AXL messages at every lifecycle stage
+- `src/agents/runtime.ts` — Wired all bridges + KeeperHub payments
+  - KH_API_KEY → real USDC payments | no key → demo receipts
+
+Verified:
+- `tsc --noEmit`: PASS, 0 errors
+- `GET /api/health`: live, 10.48 A0GI, all contracts
+- `GET /api/axl/topology`: in-process-fallback mode confirmed
 
 ---
 

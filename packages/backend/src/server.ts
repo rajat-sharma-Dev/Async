@@ -147,6 +147,15 @@ app.get('/api/payments', (_req, res) => {
   res.json({ payments: runtime.listPayments() });
 });
 
+app.get('/api/axl/topology', async (_req, res) => {
+  try {
+    const topology = await runtime.getAxlTopology();
+    res.json(topology);
+  } catch (err) {
+    res.status(503).json({ error: (err as Error).message });
+  }
+});
+
 app.get('/api/llm/models', async (_req, res) => {
   try {
     const models = await getLLM().listModels();
