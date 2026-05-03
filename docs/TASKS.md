@@ -44,6 +44,10 @@
   - 📖 Ref: [README.md](./README.md) → "Environment Variables"
   - ✅ Covers: 0G Chain/Storage/Compute, AXL, KeeperHub, contract addresses, frontend
 
+> **⚠️ NOT YET DEPLOYED.** Contracts are compiled but not deployed to 0G testnet.
+> Blocked on: (1) `PRIVATE_KEY` in `.env`, (2) testnet tokens from [faucet.0g.ai](https://faucet.0g.ai/).
+> To deploy: `cp .env.example .env` → add key → `npm run contracts:deploy`
+
 ### 🔵 Pranav — AI + P2P
 
 - [ ] **AXL node setup** — Clone repo, build Go binary (`go build -o node ./cmd/node/`)
