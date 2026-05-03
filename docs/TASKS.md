@@ -101,25 +101,38 @@
 
 ### 🟢 Rajat — Contracts + Payments
 
-- [ ] **Deploy contracts to 0G testnet**
+- [ ] **Deploy contracts to 0G testnet** — Fund wallet, deploy 3 contracts, record addresses
   - 📖 Ref: [SMART_CONTRACTS.md](./SMART_CONTRACTS.md) → "Deployment"
+  - ⚠️ Needs `PRIVATE_KEY` in `.env` + testnet tokens from [faucet.0g.ai](https://faucet.0g.ai/)
+  - Run: `npm run contracts:deploy`
 
 - [ ] **Contract interaction utilities** — ethers.js wrappers for frontend + backend
   - 📖 Ref: [INTERFACES.md](./INTERFACES.md) → "Contract ABIs"
+  - After deploy: copy ABIs from `packages/contracts/artifacts/` + addresses from deploy output
 
-- [ ] **x402 payment client** — `payments/x402.ts` — handle 402 challenges
-  - 📖 Ref: [KEEPERHUB_X402.md](./KEEPERHUB_X402.md) → "x402 Protocol", "TypeScript Implementation"
+- [ ] **KeeperHub API client** — `payments/keeperhub.ts` — Direct Execution + Workflow API
+  - 📖 Ref: [KEEPERHUB_X402.md](./KEEPERHUB_X402.md) → "KeeperHub API", [tracks-docs/KeepersHub-completedocs.md](./tracks-docs/KeepersHub-completedocs.md)
+  - API: `https://app.keeperhub.com/api`, Auth: `Bearer kh_...`
+  - Endpoints: `POST /execute/transfer`, `POST /execute/contract-call`
+  - Rate: 60 req/min (direct exec), 100 req/min (API)
 
-- [ ] **KeeperHub integration** — `payments/keeper.ts` — reliable execution
-  - 📖 Ref: [KEEPERHUB_X402.md](./KEEPERHUB_X402.md) → "KeeperHub Integration"
+- [ ] **Agentic Wallet setup** — `@keeperhub/wallet` for agent payments
+  - 📖 Ref: [KEEPERHUB_X402.md](./KEEPERHUB_X402.md) → "Agentic Wallet Setup"
+  - Install: `npx -p @keeperhub/wallet keeperhub-wallet skill install && keeperhub-wallet add`
+  - Creates `~/.keeperhub/wallet.json` (HMAC secret, NOT a private key)
+  - Safety: auto ≤$5, ask ≤$100, block >$100
 
-- [ ] **Agent wallet management** — Create/manage wallets for agents
-  - 📖 Ref: [KEEPERHUB_X402.md](./KEEPERHUB_X402.md) → "Agent Payment Wrapper"
+- [ ] **x402 payment handler** — `payments/x402.ts` — handle HTTP 402 challenges
+  - 📖 Ref: [KEEPERHUB_X402.md](./KEEPERHUB_X402.md) → "x402 Protocol"
+  - Payments settle on **Base USDC** (chain 8453, token `0x833589fCD...`)
+  - Agent pays USDC only — NO gas needed (facilitator pays gas)
+  - Per-transfer cap: 100 USDC, daily cap: 200 USDC
 
-- [ ] **Payment flow: coordinator → workers**
+- [ ] **Payment distribution** — `payments/agent-payments.ts` — coordinator → workers
   - 📖 Ref: [KEEPERHUB_X402.md](./KEEPERHUB_X402.md) → "Payment Flows in AgentVerse"
+  - Uses KeeperHub Direct Execution `POST /execute/transfer`
 
-- [ ] **On-chain task creation from backend**
+- [ ] **On-chain task creation from backend** — API routes for task lifecycle
   - 📖 Ref: [SMART_CONTRACTS.md](./SMART_CONTRACTS.md) → "TaskManager.sol", [BACKEND.md](./BACKEND.md) → "API Endpoints: Tasks"
 
 ### 🔵 Pranav — Swarm + Runtime
